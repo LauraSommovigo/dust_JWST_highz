@@ -69,13 +69,22 @@ def chi(chi_0, chi_1, chi_2, z):
     """Generic quadratic redshift (z) dependence"""
     return chi_0 + chi_1 * z + chi_2 * z**2.
 
-def g(z):
-    """Growth suppression function (eq. 28, RP+2016)."""
+def g_GUREFT(z):
+    """Growth suppression function used by Yung+23 in Gureft."""
     a  = cosmo.scale_factor(z)
     om = cosmo.Om(z)
     ol = cosmo.Ode(z)
     return (0.4 * om * a)/(np.power(om,0.571428571)-ol+(1+om*0.5)*(1+ol*0.014285714))
 
+
+def g_RP2016(z):
+    """Growth suppression function used by Rodriguex-Puebla+16 (eq.28) """
+    a  = cosmo.scale_factor(z)
+    om = cosmo.Om(z)
+    ol = cosmo.Ode(z)
+    num = 2.5 * om * a
+    den = (om - ol) + (1.0 + 0.5*om) / (1.0 + ol/70.0)
+    return num / den
 
 def grad_funct(f, x, dx=1e-6):
     """
@@ -99,7 +108,7 @@ def grad_funct(f, x, dx=1e-6):
 
 def D(z):
     """Linear growth factor normalized to z=0"""
-    return g(z) / g(0)
+    return g_GUREFT(z) / g_GUREFT(0.0)
 
 def f_sigma(Mh, z):
     """Fitting function for the mass function shape at various redshift z"""
@@ -109,6 +118,7 @@ def f_sigma(Mh, z):
     b_GFT = chi(4.86693806, 0.09212356, -0.01426283, z)
     c_GFT = chi(1.19837952, -0.00142967, -0.00033074, z)
     return A_GFT * ((sigma / b_GFT)**-a_GFT + 1.) * np.exp(-c_GFT / sigma**2.)
+
 
 def dn_dlogMh_GUREFT(log10Mh, z):
     """
