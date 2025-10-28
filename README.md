@@ -4,7 +4,8 @@ This repository contains a set of Python scripts used to model the formation and
 
 Current paper draft: https://www.overleaf.com/read/kccngwhxtzfh#15f262
 
-# -- Repository Structure
+## -- Repository Structure
+
 - highz_gal_SAM.py
 Core module containing all functions used to populate the halo mass function (HMF) with galaxies.
 It defines the basic semi-analytic relations connecting halo mass, star formation, and dust production.
@@ -25,7 +26,7 @@ By varying the Mach number, it derives the dust surface density distribution (σ
 for a given halo mass and redshift.
 The resulting σ_d distributions are later fed into the population module.
 
-# -- Modeling Logic
+## -- Modeling Logic
 
 highz_gal_SAM.py → Populate halos with galaxies.
 
@@ -35,7 +36,7 @@ dust_JWST_z10_population_LF_last.py → Predict population-level observables (UV
 
 dust_JWST_z10_clumpy_ISM.py → Incorporate ISM turbulence and clumpiness effects into UV/IR predictions.
 
-# -- Physical Treatment Summary
+## -- Physical Treatment Summary
 
 For UV emission, each dust surface density (σ_d) value represents a different line of sight, allowing us to quantify
 sightline-to-sightline attenuation variations.
