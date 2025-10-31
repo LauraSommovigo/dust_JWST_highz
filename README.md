@@ -21,7 +21,7 @@ It then produces UV and IR luminosity functions (LFs) as a function of the two m
 
 - dust_JWST_z10_clumpy_ISM.py
 Investigates the impact of ISM turbulence on dust morphology and the resulting emergent luminosities.
-By varying the Mach number, it derives the dust surface density distribution (σ_d) and its effect on UV and IR emission
+By varying the Mach number, it derives the dust surface density distribution ($\Sigma_d$) and its effect on UV and IR emission
 for a given halo mass and redshift.
 The resulting σ_d distributions are later fed into the population module.
 
