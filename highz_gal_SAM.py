@@ -78,13 +78,14 @@ def g_GUREFT(z):
 
 
 def g_RP2016(z):
-    """Growth suppression function used by Rodriguex-Puebla+16 (eq.28) """
     a  = cosmo.scale_factor(z)
     om = cosmo.Om(z)
     ol = cosmo.Ode(z)
     num = 2.5 * om * a
     den = (om - ol) + (1.0 + 0.5*om) / (1.0 + ol/70.0)
     return num / den
+
+
 
 def grad_funct(f, x, dx=1e-6):
     """
@@ -118,7 +119,6 @@ def f_sigma(Mh, z):
     b_GFT = chi(4.86693806, 0.09212356, -0.01426283, z)
     c_GFT = chi(1.19837952, -0.00142967, -0.00033074, z)
     return A_GFT * ((sigma / b_GFT)**-a_GFT + 1.) * np.exp(-c_GFT / sigma**2.)
-
 
 def dn_dlogMh_GUREFT(log10Mh, z):
     """
@@ -330,7 +330,7 @@ def rd_kpc(z, Mh, spin):
     """
     Disk scale length in kpc, for given halo mass and spin parameter.
     """
-    return  4.5 * spin * r_vir(z, Mh)  # Disk scale length formula
+    return 4.5 * spin * r_vir(z, Mh)  # Disk scale length formula, 4.5 *
 
 def compute_Mdust_steps(age, tstep, SFH, time_yr, logSNr_yr, yd):
     """
@@ -591,7 +591,7 @@ REBELS_index=np.array([5, 8, 12, 14, 18, 19, 25, 27, 29, 32, 38, 39, 40])
 MUV_REB=np.array([-21.57, -21.82, -22.47, -22.66, -22.37, -21.6, -21.67, -21.93, -22.24, -21.65, -21.87, -22.71, -21.84])
 ##-- Non-par SFH (Topping+22)
 ## Attenuation V Band
-errp_Av_REB_npSFH=1.086*np.array([0.264, 0.046, 0.22, 0.021, 0.136, 0.05, 0.197, 0.097, 0.127, 0.196, 0.121, 0.105, 0.164])
+Av_REB_npSFH=1.086*np.array([0.18,0.009, 0.158,0.006, 0.069, 0.01, 0.052, 0.019, 0.085, 0.152, 0.027, 0.064, 0.097])
 errm_Av_REB_npSFH=1.086*np.array([0.043, 0.002, 0.09, 0.002, 0.009, 0.002, 0.005, 0.003, 0.032, 0.092, 0.003, 0.019, 0.018])
 errp_Av_REB_npSFH=1.86*np.array([0.264, 0.046, 0.22, 0.021, 0.136, 0.05, 0.197, 0.097, 0.127, 0.196, 0.121, 0.105, 0.164])
 #logMd_REB_AV_npSFH=np.log10(Md_from_Av(Av_REB_npSFH,1.,0.841))
