@@ -6,6 +6,9 @@ Current paper draft: https://www.overleaf.com/read/kccngwhxtzfh#15f262
 
 -- Repository Structure
 
+*dust_JWST_z10_GSD.py
+Computes absorption, extinction etc., starting from grain size distribution (silicates, carbon and PAH dust). values derived here are then used in the rest of the scripts wherever dust attenuation/emission is computed
+
 * highz_gal_SAM.py
 Core module containing all the functions used to populate the halo mass function (HMF) with galaxies.
 It defines the basic semi-analytic relations connecting halo mass, star formation, and dust production.
