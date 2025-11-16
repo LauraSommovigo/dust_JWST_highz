@@ -19,9 +19,9 @@ sfh_times = np.array([0, 10, 20, 30, 40, 50])  # in Myr, 0 = latest/current
 # ======== CONSTANTS ===========
 kb     = 1.38064852e-16      # Boltzmann constant [erg/K]
 c      = 3e10                # Speed of light [cm/s]
-pc     = 3.09e18             # Parsec [cm]
-Mpc    = 1e6 * pc            # Megaparsec [cm]
-kpc    = 1e3 * pc            # Kiloparsec [cm]
+pc_to_cm     = 3.09e18             # Parsec [cm]
+Mpc_to_cm    = 1e6 * pc_to_cm            # Megaparsec [cm]
+kpc_to_cm    = 1e3 * pc_to_cm            # Kiloparsec [cm]
 mp     = 1.67262192e-24      # Proton mass [g]
 alphab = 2.6e-13             # Case B recombination coefficient [cgs]
 G      = 6.6743e-8           # Gravitational constant [cgs]
@@ -29,13 +29,27 @@ Lsun   = 3.9e33              # Solar luminosity [erg/s]
 Msun   = 1.98840987e33       # Solar mass [g]
 yr     = 3.154e+7            # Year [s]
 Myr    = 1e6 * yr            # Megayear [s]
-mu     = 1.22                # Mean molecular weight (typical ISM)
+mu_gas     = 1.22                # Mean molecular weight (typical ISM)
 To     = 2.725               # CMB temperature at z=0 [K]
-kl     = 3.81e-3             # Kappa lambda (cm^2/g)
 h      = 6.63e-27            # Planck constant [erg*s]
 Zsun   = 0.0142              # Solar metallicity
-DMW    = 1. / 162.           # Milky Way dust-to-gas ratio
+D_MW    = 1. / 162.           # Milky Way dust-to-gas ratio
 hlittle = cosmo.h            # Dimensionless Hubble parameter
+
+
+
+# == Dust Model Parameters (computed in dust_JWST_z10_GSD.py; in principle other GSD can be tried) ==
+kUV_hir = 18559.54915539  # 1500 Angstrom opacity [cm^2/g] for Hirashita+22 stellar dust
+kUV_hir_abs = 9679.87080737  # 1500 Angstrom absorption opacity [cm^2/g] for Hirashita+22 stellar dust
+kv_hir = 21158.51486479  # V-band opacity [cm^2/g] for Hirashita+22 stellar dust
+kIR_hir = 8.32842305  # 158 micron opacity [cm^2/g] for Hirashita+22 stellar dust
+
+kUV_drn = 68476.44934565  # 1500 Angstrom opacity [cm^2/g] for MW-like dust (Draine 2003)
+kUV_drn_abs = 33961.82896294  # 1500 Angstrom absorption opacity [cm^2/g] for MW-like dust (Draine 2003)
+kv_drn= 20593.65113121  # V-band opacity [cm^2/g] for MW-like dust (Draine 2003)
+kIR_drn = 12.85127581  # 158 micron opacity [cm^2/g] for MW-like dust (Draine 2003)
+
+
 
 ### Fixing random seed for spin and sigma gas distribution
 # Remove unused numpy random import for clarity
@@ -86,7 +100,6 @@ def g_RP2016(z):
     return num / den
 
 
-
 def grad_funct(f, x, dx=1e-6):
     """
     Numerically compute the gradient of function f at x using central finite differences.
@@ -132,7 +145,7 @@ def dn_dlogMh_GUREFT(log10Mh, z):
     d_log_sigma = np.gradient(-np.log(sigma_funct(Mh)), Mh)
     d_log_Mh = np.gradient(np.log(Mh), Mh)
     return (np.log(10) * f_sigma(Mh, z) * rho_m / (Mh * Msun) *
-            np.abs(d_log_sigma / d_log_Mh) * Mpc**3)
+            np.abs(d_log_sigma / d_log_Mh) * Mpc_to_cm**3)
 
 def dn_dMh_GUREFT(Mh, z):
     """Halo mass function per unit mass at redshift z"""
@@ -140,13 +153,12 @@ def dn_dMh_GUREFT(Mh, z):
     d_log_sigma = np.gradient(-np.log(sigma_funct(Mh)), Mh)
     d_log_Mh = np.gradient(np.log(Mh), Mh)
     return (f_sigma(Mh, z) * rho_m / Mh**2 *
-            np.abs(d_log_sigma / d_log_Mh) * Mpc**3 / Msun)
+            np.abs(d_log_sigma / d_log_Mh) * Mpc_to_cm**3 / Msun)
 
 # --- Star Formation Rate (SFR) / Mass Accretion
 def dMhdt_GUREFT(Mh, z):
     """dMh/dt for halo growth (Yung+23), at redshift z"""
     return 10**logbeta_funct(z) * (1e-12 * Mh * E(z))**alpha_funct(z)  # Msun/yr
-
 
 
 def alpha_funct(z):
@@ -315,8 +327,10 @@ def compute_dotNion_steps(age, tstep, SFH, time_yr_Nion, log_dotNion):
 
 
 
-
+#----------------------------------------------------------
 # --- DUST build up functions: from halo/dust properties
+#----------------------------------------------------------
+
 def r_vir(z, Mh):
     """
     Virial radius [kpc] for a given halo mass and redshift z.
@@ -371,7 +385,7 @@ def tau_pred(klam, Md, Mh, spin, z):
     """
     fmu = 4. / 3.   #sphere, mixed
     #fmu=0.841 #slab
-    return klam * Md / (fmu * np.pi * rd_kpc(z, Mh, spin)**2) * Msun / kpc**2
+    return klam * Md / (fmu * np.pi * rd_kpc(z, Mh, spin)**2) * Msun / kpc_to_cm**2
 
 # --- UV Attenuation: T_1500
 # Slab geometry
@@ -406,32 +420,7 @@ def T_1500_sphere_im(tau_1500):
     Tl = 3./(4.*tau_1500) * (1. - 1./(2*tau_1500**2) + (1./tau_1500 + 1./(2*tau_1500**2)) * np.exp(-2.*tau_1500))
     return Tl
 
-
-# --- Hirashita+19 Attenuation Curve ---
-kv = 8.55e3 / (1 - 0.674)         # cm^2/g
-kUV = 3.92e4 / (1 - 0.3807)       # cm^2/g# 1400 angstrom
-hir_file = "/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/Hirashita_dense_01Gyr_AttCurve.txt"
-hir_data = np.loadtxt(hir_file)
-lambda_ang_hir = 1e4 / hir_data[:, 0]   # Convert 1/micron to Angstrom
-Alambda_over_Av_hir = hir_data[:, 1]
-# Interpolation in lambda [Angstrom]
-hir_interp = interp1d(lambda_ang_hir, Alambda_over_Av_hir, kind='linear', bounds_error=False, fill_value='extrapolate')
-
-# --- Draine+03 ME dust model ---
-drn_file = "/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/Draine_MWDustRV31_Optical_prop.txt"
-drn_data = np.loadtxt(drn_file)
-lambda_ang_drn = drn_data[:, 0] * 1e4               # microns to Angstrom
-albedo, kabs = drn_data[:, 1], drn_data[:, 4]
-kabs_corr = (kabs * 90 / 163) / (1 - albedo)
-kabs_corr /= kabs_corr[np.argmin(np.abs(lambda_ang_drn - 5540))]  # normalize at 5540 Å
-# Interpolation in lambda [Angstrom]
-drn_interp = interp1d(lambda_ang_drn, kabs_corr, kind='linear', bounds_error=False, fill_value='extrapolate')
-# --- Compute rescaled kUVs at 1500 Å ---
-lambda_UV = 1500
-kUV_hir = kv * hir_interp(lambda_UV)
-kUV_drn = kv * drn_interp(lambda_UV)
-
-# --- Functional form for the Attenuation Curve ---
+# --- Functional form for the Attenuation Curve (not used at this stage) ---
 def Li_08(lam_micron, c1, c2, c3, c4, model):
     """
     Computes an attenuation curve A(λ)/A_V following the Li+08 parameterization,
@@ -475,6 +464,88 @@ def Li_08(lam_micron, c1, c2, c3, c4, model):
     return A_lam_v
 
 
+
+
+#----- Parameters for dust grain size dristribution from Weingartner & Draine (2001) for Milky Way-type dust
+#----- Different values of Rv and bC (carbon abundance in very small grains)
+WD01_MW_PARAMS = {
+
+    3.1: {
+        "A": [
+            {'bC':0.0, 'alpha_g':-2.25, 'beta_g':-0.0648, 'at_g':0.00745, 'ac_g':0.606, 'Cg':9.94e-11,
+                           'alpha_s':-1.48, 'beta_s':-9.34,    'at_s':0.172, 'Cs':1.02e-12},
+            {'bC':1.0, 'alpha_g':-2.17, 'beta_g':-0.0382, 'at_g':0.00373, 'ac_g':0.586, 'Cg':3.79e-10,
+                           'alpha_s':-1.46, 'beta_s':-10.3,   'at_s':0.174, 'Cs':1.09e-12},
+            {'bC':2.0, 'alpha_g':-2.04, 'beta_g':-0.111,  'at_g':0.00828, 'ac_g':0.543, 'Cg':5.57e-11,
+                           'alpha_s':-1.43, 'beta_s':-11.7,   'at_s':0.173, 'Cs':1.27e-12},
+            {'bC':3.0, 'alpha_g':-1.91, 'beta_g':-0.125,  'at_g':0.00837, 'ac_g':0.499, 'Cg':4.15e-11,
+                           'alpha_s':-1.41, 'beta_s':-11.5,   'at_s':0.171, 'Cs':1.33e-12},
+            {'bC':4.0, 'alpha_g':-1.84, 'beta_g':-0.132,  'at_g':0.00898, 'ac_g':0.489, 'Cg':2.90e-11,
+                           'alpha_s':-2.10, 'beta_s':-0.14,   'at_s':0.169, 'Cs':1.26e-13},
+            {'bC':5.0, 'alpha_g':-1.72, 'beta_g':-0.322,  'at_g':0.0254,  'ac_g':0.438, 'Cg':3.32e-12,
+                           'alpha_s':-2.10, 'beta_s':-0.0407, 'at_s':0.166, 'Cs':1.27e-13},
+            {'bC':6.0, 'alpha_g':-1.54, 'beta_g':-0.165,  'at_g':0.0107,  'ac_g':0.428, 'Cg':9.99e-12,
+                           'alpha_s':-2.21, 'beta_s':0.300,   'at_s':0.164, 'Cs':1.00e-13},
+        ]
+    },
+
+    4.0: {
+        "A": [
+            {'bC':0.0, 'alpha_g':-2.26, 'beta_g':-0.199, 'at_g':0.0241, 'ac_g':0.861, 'Cg':5.47e-12,
+                           'alpha_s':-2.03, 'beta_s':0.668, 'at_s':0.189, 'Cs':5.20e-14},
+            {'bC':1.0, 'alpha_g':-2.16, 'beta_g':-0.0862,'at_g':0.00867,'ac_g':0.803,'Cg':4.58e-11,
+                           'alpha_s':-2.05, 'beta_s':0.832, 'at_s':0.188, 'Cs':4.81e-14},
+            {'bC':2.0, 'alpha_g':-2.01, 'beta_g':-0.0973,'at_g':0.00811,'ac_g':0.696,'Cg':3.96e-11,
+                           'alpha_s':-2.06, 'beta_s':0.995, 'at_s':0.185, 'Cs':4.70e-14},
+            {'bC':3.0, 'alpha_g':-1.83, 'beta_g':-0.175, 'at_g':0.0117, 'ac_g':0.604,'Cg':1.42e-11,
+                           'alpha_s':-2.08, 'beta_s':1.29,  'at_s':0.184, 'Cs':4.26e-14},
+            {'bC':4.0, 'alpha_g':-1.64, 'beta_g':-0.247, 'at_g':0.0152, 'ac_g':0.536,'Cg':5.83e-12,
+                           'alpha_s':-2.09, 'beta_s':1.58,  'at_s':0.183, 'Cs':3.94e-14},
+        ],
+        "B": [
+            {'bC':0.0, 'alpha_g':-2.62,'beta_g':-0.0144,'at_g':0.0187,'ac_g':5.74,'Cg':6.40e-12,
+                           'alpha_s':-2.01,'beta_s':0.894,'at_s':0.198,'Cs':4.95e-14},
+            {'bC':1.0, 'alpha_g':-2.52,'beta_g':-0.0541,'at_g':0.0366,'ac_g':6.65,'Cg':1.08e-12,
+                           'alpha_s':-2.11,'beta_s':1.58, 'at_s':0.197,'Cs':3.69e-14},
+            {'bC':2.0, 'alpha_g':-2.36,'beta_g':-0.0957,'at_g':0.0305,'ac_g':6.44,'Cg':1.62e-12,
+                           'alpha_s':-2.05,'beta_s':1.19, 'at_s':0.197,'Cs':4.37e-14},
+            {'bC':3.0, 'alpha_g':-2.09,'beta_g':-0.193, 'at_g':0.0199,'ac_g':4.60,'Cg':4.21e-12,
+                           'alpha_s':-2.10,'beta_s':1.64, 'at_s':0.198,'Cs':3.63e-14},
+            {'bC':4.0, 'alpha_g':-1.96,'beta_g':-0.813, 'at_g':0.0693,'ac_g':3.48,'Cg':2.95e-12,
+                           'alpha_s':-2.11,'beta_s':0.996,'at_s':0.199,'Cs':3.13e-14},
+        ]
+    },
+
+    5.5: {
+        "A": [
+            {'bC':0.0,'alpha_g':-2.35,'beta_g':-0.668,'at_g':0.148,'ac_g':1.96,'Cg':4.82e-14,
+                         'alpha_s':-1.57,'beta_s':1.10,'at_s':0.198,'Cs':4.24e-14},
+            {'bC':1.0,'alpha_g':-2.12,'beta_g':-0.670,'at_g':0.0686,'ac_g':1.35,'Cg':3.65e-13,
+                         'alpha_s':-1.57,'beta_s':1.25,'at_s':0.197,'Cs':4.00e-14},
+            {'bC':2.0,'alpha_g':-1.94,'beta_g':-0.853,'at_g':0.0786,'ac_g':0.921,'Cg':2.57e-13,
+                         'alpha_s':-1.55,'beta_s':1.33,'at_s':0.195,'Cs':4.05e-14},
+            {'bC':3.0,'alpha_g':-1.61,'beta_g':-0.722,'at_g':0.0418,'ac_g':0.720,'Cg':7.58e-13,
+                         'alpha_s':-1.59,'beta_s':2.12,'at_s':0.193,'Cs':2.61e-14},
+        ],
+        "B": [
+            {'bC':0.0,'alpha_g':-2.80,'beta_g':0.0356,'at_g':0.0203,'ac_g':3.43,'Cg':2.74e-12,
+                         'alpha_s':-1.09,'beta_s':-0.370,'at_s':0.218,'Cs':1.17e-13},
+            {'bC':1.0,'alpha_g':-2.67,'beta_g':0.0129,'at_g':0.0134,'ac_g':3.44,'Cg':7.27e-12,
+                         'alpha_s':-1.14,'beta_s':-0.195,'at_s':0.216,'Cs':1.05e-13},
+            {'bC':2.0,'alpha_g':-2.45,'beta_g':-0.00132,'at_g':0.0275,'ac_g':5.14,'Cg':8.79e-13,
+                         'alpha_s':-1.08,'beta_s':-0.336,'at_s':0.216,'Cs':1.17e-13},
+            {'bC':3.0,'alpha_g':-1.90,'beta_g':-0.0517,'at_g':0.0120,'ac_g':7.28,'Cg':2.86e-12,
+                         'alpha_s':-1.13,'beta_s':-0.109,'at_s':0.211,'Cs':1.04e-13},
+        ]
+    }
+}
+
+
+
+
+#----------------------------------------------------------
+#--- Turbulent Gas Surface Density Distribution  functions 
+#----------------------------------------------------------
 def compute_R(Mach):
     """
     Computes the compression ratio R as defined in Equation (15) of Thompson et al. (2016),
@@ -618,6 +689,13 @@ errm_Age_REB=10**np.array([6.66, 7.1, 6.52, 6.49, 7.29, 6.96, 8.45, 8.02, 8.14, 
 errm_Age_REB=Age_REB-1e-6*errm_Age_REB
 errp_Age_REB=10**np.array([8.61, 8.47, 7.63, 7.77, 8.52, 8.29, 8.81, 8.69, 8.51, 8.16, 8.73, 6.61, 8.67])
 errp_Age_REB=-Age_REB + 1e-6*errp_Age_REB
+
+reds_REB=np.array([6.49632623080003, 6.74949312222826, 7.34591349960637, 7.08424192680435, 7.67499921115377, 7.37010028069009, 7.30651374725317, 7.08975543485707, 6.68474280897578, 6.72902239593933, 6.57701183413199, 6.84488626164266, 7.36495347204348])
+#computing Im
+betaUV_REB=np.array([-1.29, -2.17, -1.99, -2.21, -1.34, -2.33, -1.85, -1.79, -1.61, -1.50, -2.18, -1.96, -1.44])
+#print 'betaUV med and dev reb', betaUV_REB.mean(), numpy.std(betaUV_REB)
+IR_Flux_meas= np.array([67.233017562467, 101.443285027657, 86.7784069441866, 59.9864001077979, 52.8727962380168, 71.1547654942816, 259.549851951265, 50.5904947746512, 56.0849016628018, 60.3849166209817, 162.997677399763, 79.7361487750138, 48.2836056474205])#microJy
+err_IR_Flux_meas= np.array([13., 20., 24., 15., 10., 20., 22., 10., 13., 17., 23, 16., 13.])#microJy
 
 
 def Plot_LF_Data(z, ax):
@@ -873,6 +951,8 @@ def Plot_LF_Data(z, ax):
         ax.errorbar(MUV_13p5_15, phi_13p5_15,
                      yerr=phi_13p5_15_err,
                      ls='None', marker='+', ms=9., capsize=5., alpha=0.6,
-                     color='grey', label='$13.5 < z < 15$', mew=1.2, mec='black')
+                     color='grey', label='Robertson+24, $13.5 < z < 15$', mew=1.2, mec='black')
     print('Data ADDED!\n\n')
     return
+
+
