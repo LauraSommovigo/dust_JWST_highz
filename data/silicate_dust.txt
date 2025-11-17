@@ -1,4 +1,4 @@
-1.000E-03 = radius(micron) Astronomical silicate, smoothed UV      
+1.000E-03 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 1.380E-07 2.525E-21 0.00E+00
 9.441E+02 1.548E-07 3.179E-21 0.00E+00
@@ -242,7 +242,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 1.896E-03 1.659E-05 9.34E-01
 1.000E-03 1.629E-03 1.462E-05 9.38E-01
 
-1.5849E-03 = radius(micron) Astronomical silicate, smoothed UV      
+1.5849E-03 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 2.187E-07 1.593E-20 0.00E+00
 9.441E+02 2.454E-07 2.006E-20 0.00E+00
@@ -486,7 +486,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 3.002E-03 4.334E-05 9.69E-01
 1.000E-03 2.580E-03 3.802E-05 9.71E-01
 
-2.5119E-03 = radius(micron) Astronomical silicate, smoothed UV      
+2.5119E-03 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 3.466E-07 1.005E-19 0.00E+00
 9.441E+02 3.889E-07 1.265E-19 0.00E+00
@@ -730,7 +730,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 4.753E-03 1.108E-04 9.86E-01
 1.000E-03 4.086E-03 9.702E-05 9.87E-01
 
-3.9811E-03 = radius(micron) Astronomical silicate, smoothed UV      
+3.9811E-03 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 5.493E-07 6.342E-19 0.00E+00
 9.441E+02 6.164E-07 7.984E-19 0.00E+00
@@ -974,7 +974,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 7.521E-03 2.801E-04 9.93E-01
 1.000E-03 6.467E-03 2.452E-04 9.94E-01
 
-6.3096E-03 = radius(micron) Astronomical silicate, smoothed UV      
+6.3096E-03 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 8.706E-07 4.002E-18 0.00E+00
 9.441E+02 9.769E-07 5.038E-18 0.00E+00
@@ -1218,7 +1218,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 1.189E-02 7.045E-04 9.97E-01
 1.000E-03 1.023E-02 6.167E-04 9.97E-01
 
-1.0000E-02 = radius(micron) Astronomical silicate, smoothed UV      
+1.0000E-02 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 1.380E-06 2.525E-17 0.00E+00
 9.441E+02 1.548E-06 3.179E-17 0.00E+00
@@ -1462,7 +1462,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 1.877E-02 1.765E-03 9.99E-01
 1.000E-03 1.615E-02 1.546E-03 9.99E-01
 
-1.5849E-02 = radius(micron) Astronomical silicate, smoothed UV      
+1.5849E-02 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 2.187E-06 1.593E-16 0.00E+00
 9.441E+02 2.454E-06 2.006E-16 0.00E+00
@@ -1706,7 +1706,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 2.956E-02 4.407E-03 9.99E-01
 1.000E-03 2.547E-02 3.863E-03 9.99E-01
 
-2.5119E-02 = radius(micron) Astronomical silicate, smoothed UV      
+2.5119E-02 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 3.466E-06 1.005E-15 0.00E+00
 9.441E+02 3.889E-06 1.265E-15 0.00E+00
@@ -1950,7 +1950,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 4.640E-02 1.095E-02 1.00E+00
 1.000E-03 4.002E-02 9.612E-03 1.00E+00
 
-3.9811E-02 = radius(micron) Astronomical silicate, smoothed UV      
+3.9811E-02 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 5.493E-06 6.342E-15 0.00E+00
 9.441E+02 6.164E-06 7.984E-15 0.00E+00
@@ -2194,7 +2194,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 7.241E-02 2.701E-02 1.00E+00
 1.000E-03 6.259E-02 2.377E-02 1.00E+00
 
-6.3096E-02 = radius(micron) Astronomical silicate, smoothed UV      
+6.3096E-02 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 8.706E-06 4.002E-14 0.00E+00
 9.441E+02 9.769E-06 5.038E-14 0.00E+00
@@ -2438,7 +2438,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 1.120E-01 6.579E-02 1.00E+00
 1.000E-03 9.714E-02 5.815E-02 1.00E+00
 
-1.0000E-01 = radius(micron) Astronomical silicate, smoothed UV      
+1.0000E-01 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 1.380E-05 2.525E-13 0.00E+00
 9.441E+02 1.548E-05 3.179E-13 0.00E+00
@@ -2682,7 +2682,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 1.709E-01 1.568E-01 1.00E+00
 1.000E-03 1.490E-01 1.396E-01 1.00E+00
 
-1.5849E-01 = radius(micron) Astronomical silicate, smoothed UV      
+1.5849E-01 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 2.187E-05 1.593E-12 0.00E+00
 9.441E+02 2.454E-05 2.006E-12 5.62E-07
@@ -2926,7 +2926,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 2.554E-01 3.592E-01 1.00E+00
 1.000E-03 2.244E-01 3.235E-01 1.00E+00
 
-2.5119E-01 = radius(micron) Astronomical silicate, smoothed UV      
+2.5119E-01 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 3.466E-05 1.005E-11 1.26E-06
 9.441E+02 3.889E-05 1.265E-11 1.41E-06
@@ -3170,7 +3170,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 3.699E-01 8.823E-01 1.00E+00
 1.000E-03 3.288E-01 8.163E-01 1.00E+00
 
-3.9811E-01 = radius(micron) Astronomical silicate, smoothed UV      
+3.9811E-01 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 5.493E-05 6.342E-11 3.16E-06
 9.441E+02 6.164E-05 7.984E-11 3.54E-06
@@ -3414,7 +3414,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 5.121E-01 1.235E+00 1.00E+00
 1.000E-03 4.628E-01 1.222E+00 1.00E+00
 
-6.3096E-01 = radius(micron) Astronomical silicate, smoothed UV      
+6.3096E-01 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 8.707E-05 4.002E-10 7.94E-06
 9.441E+02 9.770E-05 5.038E-10 8.90E-06
@@ -3658,7 +3658,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 6.673E-01 1.277E+00 1.00E+00
 1.000E-03 6.164E-01 1.312E+00 1.00E+00
 
-1.0000E+00 = radius(micron) Astronomical silicate, smoothed UV      
+1.0000E+00 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 1.380E-04 2.525E-09 1.99E-05
 9.441E+02 1.549E-04 3.179E-09 2.24E-05
@@ -3902,7 +3902,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 8.078E-01 1.182E+00 1.00E+00
 1.000E-03 7.651E-01 1.222E+00 1.00E+00
 
-1.5849E+00 = radius(micron) Astronomical silicate, smoothed UV      
+1.5849E+00 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 2.188E-04 1.593E-08 5.01E-05
 9.441E+02 2.455E-04 2.006E-08 5.62E-05
@@ -4146,7 +4146,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 9.071E-01 1.091E+00 1.00E+00
 1.000E-03 8.799E-01 1.118E+00 1.00E+00
 
-2.5119E+00 = radius(micron) Astronomical silicate, smoothed UV      
+2.5119E+00 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 3.469E-04 1.005E-07 1.26E-04
 9.441E+02 3.893E-04 1.266E-07 1.41E-04
@@ -4390,7 +4390,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 9.605E-01 1.039E+00 1.00E+00
 1.000E-03 9.473E-01 1.052E+00 1.00E+00
 
-3.9811E+00 = radius(micron) Astronomical silicate, smoothed UV      
+3.9811E+00 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 5.504E-04 6.346E-07 3.16E-04
 9.441E+02 6.178E-04 7.989E-07 3.55E-04
@@ -4634,7 +4634,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 9.840E-01 1.016E+00 1.00E+00
 1.000E-03 9.785E-01 1.021E+00 1.00E+00
 
-6.3096E+00 = radius(micron) Astronomical silicate, smoothed UV      
+6.3096E+00 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 8.750E-04 4.007E-06 7.94E-04
 9.441E+02 9.824E-04 5.045E-06 8.91E-04
@@ -4878,7 +4878,7 @@ w(micron)  Q_abs     Q_sca     g=<cos>
 1.059E-03 9.935E-01 1.006E+00 1.00E+00
 1.000E-03 9.913E-01 1.009E+00 1.00E+00
 
-1.0000E+01 = radius(micron) Astronomical silicate, smoothed UV      
+1.0000E+01 = radius(micron) Astronomical silicate, smoothed UV
 w(micron)  Q_abs     Q_sca     g=<cos>
 1.000E+03 1.397E-03 2.533E-05 2.00E-03
 9.441E+02 1.570E-03 3.191E-05 2.24E-03

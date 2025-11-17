@@ -1,4 +1,4 @@
-3.548E-04 = radius(micron) neutral PAH/graphitic solid             
+3.548E-04 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 1.999E-09 1.999E-09 6.536E-23 0.00E+00
 9.886E+02 2.045E-09 2.045E-09 6.844E-23 0.00E+00
@@ -1202,7 +1202,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 1.471E-04 1.463E-04 7.398E-07 6.79E-01
 1.000E-03 1.422E-04 1.415E-04 7.247E-07 6.87E-01
 
-3.981E-04 = radius(micron) neutral PAH/graphitic solid             
+3.981E-04 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 2.159E-09 2.159E-09 1.036E-22 0.00E+00
 9.886E+02 2.208E-09 2.208E-09 1.085E-22 0.00E+00
@@ -2406,7 +2406,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 1.651E-04 1.642E-04 9.721E-07 7.42E-01
 1.000E-03 1.597E-04 1.587E-04 9.529E-07 7.47E-01
 
-4.467E-04 = radius(micron) neutral PAH/graphitic solid             
+4.467E-04 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 2.319E-09 2.319E-09 1.643E-22 0.00E+00
 9.886E+02 2.372E-09 2.372E-09 1.720E-22 0.00E+00
@@ -3610,7 +3610,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 1.855E-04 1.842E-04 1.285E-06 7.79E-01
 1.000E-03 1.794E-04 1.781E-04 1.260E-06 7.82E-01
 
-5.012E-04 = radius(micron) neutral PAH/graphitic solid             
+5.012E-04 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 2.503E-09 2.503E-09 2.604E-22 0.00E+00
 9.886E+02 2.560E-09 2.560E-09 2.727E-22 0.00E+00
@@ -4814,7 +4814,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 2.083E-04 2.067E-04 1.696E-06 8.04E-01
 1.000E-03 2.015E-04 1.998E-04 1.662E-06 8.06E-01
 
-5.623E-04 = radius(micron) neutral PAH/graphitic solid             
+5.623E-04 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 2.725E-09 2.725E-09 4.128E-22 0.00E+00
 9.886E+02 2.787E-09 2.787E-09 4.322E-22 0.00E+00
@@ -6018,7 +6018,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 2.341E-04 2.319E-04 2.212E-06 8.34E-01
 1.000E-03 2.264E-04 2.242E-04 2.165E-06 8.38E-01
 
-6.310E-04 = radius(micron) neutral PAH/graphitic solid             
+6.310E-04 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 2.963E-09 2.963E-09 6.544E-22 0.00E+00
 9.886E+02 3.031E-09 3.031E-09 6.852E-22 0.00E+00
@@ -7222,7 +7222,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 2.630E-04 2.601E-04 2.854E-06 8.69E-01
 1.000E-03 2.543E-04 2.516E-04 2.790E-06 8.72E-01
 
-7.079E-04 = radius(micron) neutral PAH/graphitic solid             
+7.079E-04 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 3.243E-09 3.243E-09 1.037E-21 0.00E+00
 9.886E+02 3.316E-09 3.316E-09 1.086E-21 0.00E+00
@@ -8426,7 +8426,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 2.955E-04 2.919E-04 3.677E-06 8.92E-01
 1.000E-03 2.858E-04 2.822E-04 3.596E-06 8.94E-01
 
-7.943E-04 = radius(micron) neutral PAH/graphitic solid             
+7.943E-04 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 3.557E-09 3.557E-09 1.644E-21 0.00E+00
 9.886E+02 3.637E-09 3.637E-09 1.722E-21 0.00E+00
@@ -9630,7 +9630,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 3.322E-04 3.275E-04 4.734E-06 9.06E-01
 1.000E-03 3.213E-04 3.167E-04 4.628E-06 9.08E-01
 
-8.913E-04 = radius(micron) neutral PAH/graphitic solid             
+8.913E-04 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 3.910E-09 3.910E-09 2.606E-21 0.00E+00
 9.886E+02 3.997E-09 3.997E-09 2.729E-21 0.00E+00
@@ -10834,7 +10834,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 3.735E-04 3.674E-04 6.053E-06 9.25E-01
 1.000E-03 3.612E-04 3.553E-04 5.914E-06 9.27E-01
 
-1.000E-03 = radius(micron) neutral PAH/graphitic solid             
+1.000E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 4.309E-09 4.309E-09 4.131E-21 0.00E+00
 9.886E+02 4.405E-09 4.405E-09 4.326E-21 0.00E+00
@@ -12038,7 +12038,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 4.200E-04 4.122E-04 7.730E-06 9.37E-01
 1.000E-03 4.062E-04 3.986E-04 7.552E-06 9.38E-01
 
-1.122E-03 = radius(micron) neutral PAH/graphitic solid             
+1.122E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 4.762E-09 4.762E-09 6.549E-21 0.00E+00
 9.886E+02 4.868E-09 4.868E-09 6.857E-21 0.00E+00
@@ -13242,7 +13242,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 4.724E-04 4.625E-04 9.847E-06 9.48E-01
 1.000E-03 4.569E-04 4.472E-04 9.616E-06 9.49E-01
 
-1.259E-03 = radius(micron) neutral PAH/graphitic solid             
+1.259E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 5.274E-09 5.274E-09 1.038E-20 0.00E+00
 9.886E+02 5.391E-09 5.391E-09 1.087E-20 0.00E+00
@@ -14446,7 +14446,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 5.314E-04 5.189E-04 1.252E-05 9.57E-01
 1.000E-03 5.140E-04 5.018E-04 1.222E-05 9.58E-01
 
-1.413E-03 = radius(micron) neutral PAH/graphitic solid             
+1.413E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 5.853E-09 5.853E-09 1.646E-20 0.00E+00
 9.886E+02 5.982E-09 5.982E-09 1.723E-20 0.00E+00
@@ -15650,7 +15650,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 5.981E-04 5.822E-04 1.588E-05 9.65E-01
 1.000E-03 5.785E-04 5.630E-04 1.551E-05 9.66E-01
 
-1.585E-03 = radius(micron) neutral PAH/graphitic solid             
+1.585E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 6.505E-09 6.505E-09 2.608E-20 0.00E+00
 9.886E+02 6.648E-09 6.648E-09 2.731E-20 0.00E+00
@@ -16854,7 +16854,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 6.733E-04 6.532E-04 2.013E-05 9.71E-01
 1.000E-03 6.513E-04 6.317E-04 1.965E-05 9.71E-01
 
-1.778E-03 = radius(micron) neutral PAH/graphitic solid             
+1.778E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 7.242E-09 7.242E-09 4.135E-20 0.00E+00
 9.886E+02 7.401E-09 7.401E-09 4.330E-20 0.00E+00
@@ -18058,7 +18058,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 7.584E-04 7.329E-04 2.548E-05 9.76E-01
 1.000E-03 7.336E-04 7.087E-04 2.488E-05 9.76E-01
 
-1.995E-03 = radius(micron) neutral PAH/graphitic solid             
+1.995E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 8.071E-09 8.071E-09 6.555E-20 0.00E+00
 9.886E+02 8.248E-09 8.248E-09 6.864E-20 0.00E+00
@@ -19262,7 +19262,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 8.545E-04 8.223E-04 3.222E-05 9.80E-01
 1.000E-03 8.266E-04 7.951E-04 3.146E-05 9.81E-01
 
-2.239E-03 = radius(micron) neutral PAH/graphitic solid             
+2.239E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 9.004E-09 9.004E-09 1.039E-19 0.00E+00
 9.886E+02 9.201E-09 9.201E-09 1.088E-19 0.00E+00
@@ -20466,7 +20466,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 9.632E-04 9.225E-04 4.072E-05 9.84E-01
 1.000E-03 9.318E-04 8.921E-04 3.974E-05 9.84E-01
 
-2.512E-03 = radius(micron) neutral PAH/graphitic solid             
+2.512E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 1.005E-08 1.005E-08 1.648E-19 0.00E+00
 9.886E+02 1.027E-08 1.027E-08 1.725E-19 0.00E+00
@@ -21670,7 +21670,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 1.086E-03 1.035E-03 5.142E-05 9.87E-01
 1.000E-03 1.051E-03 1.001E-03 5.019E-05 9.87E-01
 
-2.818E-03 = radius(micron) neutral PAH/graphitic solid             
+2.818E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 1.122E-08 1.122E-08 2.612E-19 0.00E+00
 9.886E+02 1.147E-08 1.147E-08 2.735E-19 0.00E+00
@@ -22874,7 +22874,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 1.226E-03 1.161E-03 6.490E-05 9.89E-01
 1.000E-03 1.186E-03 1.123E-03 6.334E-05 9.89E-01
 
-3.162E-03 = radius(micron) neutral PAH/graphitic solid             
+3.162E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 1.252E-08 1.252E-08 4.141E-19 0.00E+00
 9.886E+02 1.280E-08 1.280E-08 4.336E-19 0.00E+00
@@ -24078,7 +24078,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 1.385E-03 1.303E-03 8.187E-05 9.91E-01
 1.000E-03 1.340E-03 1.260E-03 7.989E-05 9.91E-01
 
-3.548E-03 = radius(micron) neutral PAH/graphitic solid             
+3.548E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 1.397E-08 1.397E-08 6.566E-19 0.00E+00
 9.886E+02 1.428E-08 1.428E-08 6.875E-19 0.00E+00
@@ -25282,7 +25282,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 1.565E-03 1.462E-03 1.032E-04 9.93E-01
 1.000E-03 1.514E-03 1.413E-03 1.007E-04 9.93E-01
 
-3.981E-03 = radius(micron) neutral PAH/graphitic solid             
+3.981E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 1.558E-08 1.558E-08 1.041E-18 0.00E+00
 9.886E+02 1.593E-08 1.593E-08 1.090E-18 0.00E+00
@@ -26486,7 +26486,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 1.770E-03 1.640E-03 1.301E-04 9.94E-01
 1.000E-03 1.713E-03 1.586E-03 1.270E-04 9.94E-01
 
-4.467E-03 = radius(micron) neutral PAH/graphitic solid             
+4.467E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 1.737E-08 1.737E-08 1.650E-18 0.00E+00
 9.886E+02 1.776E-08 1.776E-08 1.728E-18 0.00E+00
@@ -27690,7 +27690,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 2.004E-03 1.840E-03 1.640E-04 9.95E-01
 1.000E-03 1.939E-03 1.779E-03 1.600E-04 9.95E-01
 
-5.012E-03 = radius(micron) neutral PAH/graphitic solid             
+5.012E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 2.615E-08 2.615E-08 2.617E-18 0.00E+00
 9.886E+02 2.674E-08 2.674E-08 2.740E-18 0.00E+00
@@ -28894,7 +28894,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 2.271E-03 2.064E-03 2.066E-04 9.96E-01
 1.000E-03 2.198E-03 1.996E-03 2.016E-04 9.96E-01
 
-5.623E-03 = radius(micron) neutral PAH/graphitic solid             
+5.623E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 3.365E-07 3.365E-07 4.148E-18 0.00E+00
 9.886E+02 3.439E-07 3.439E-07 4.344E-18 0.00E+00
@@ -30098,7 +30098,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 2.576E-03 2.315E-03 2.603E-04 9.97E-01
 1.000E-03 2.493E-03 2.239E-03 2.540E-04 9.97E-01
 
-6.310E-03 = radius(micron) neutral PAH/graphitic solid             
+6.310E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 6.117E-07 6.117E-07 6.577E-18 0.00E+00
 9.886E+02 6.253E-07 6.253E-07 6.886E-18 0.00E+00
@@ -31302,7 +31302,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 2.925E-03 2.597E-03 3.279E-04 9.97E-01
 1.000E-03 2.832E-03 2.512E-03 3.199E-04 9.97E-01
 
-7.079E-03 = radius(micron) neutral PAH/graphitic solid             
+7.079E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 8.622E-07 8.622E-07 1.043E-17 0.00E+00
 9.886E+02 8.816E-07 8.816E-07 1.092E-17 0.00E+00
@@ -32506,7 +32506,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 3.327E-03 2.914E-03 4.129E-04 9.98E-01
 1.000E-03 3.221E-03 2.818E-03 4.029E-04 9.98E-01
 
-7.943E-03 = radius(micron) neutral PAH/graphitic solid             
+7.943E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 1.097E-06 1.097E-06 1.653E-17 0.00E+00
 9.886E+02 1.122E-06 1.122E-06 1.731E-17 0.00E+00
@@ -33710,7 +33710,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 3.789E-03 3.269E-03 5.199E-04 9.98E-01
 1.000E-03 3.668E-03 3.161E-03 5.073E-04 9.98E-01
 
-8.913E-03 = radius(micron) neutral PAH/graphitic solid             
+8.913E-03 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 1.323E-06 1.323E-06 2.620E-17 0.00E+00
 9.886E+02 1.354E-06 1.354E-06 2.743E-17 0.00E+00
@@ -34914,7 +34914,7 @@ w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.012E-03 4.321E-03 3.667E-03 6.546E-04 9.99E-01
 1.000E-03 4.185E-03 3.546E-03 6.388E-04 9.99E-01
 
-1.000E-02 = radius(micron) neutral PAH/graphitic solid             
+1.000E-02 = radius(micron) neutral PAH/graphitic solid
 w(micron)   Q_ext     Q_abs     Q_sca    g=<cos>
 1.000E+03 1.549E-06 1.549E-06 4.153E-17 0.00E+00
 9.886E+02 1.584E-06 1.584E-06 4.349E-17 0.00E+00
