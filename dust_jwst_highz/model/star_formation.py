@@ -4,7 +4,7 @@ from astropy.cosmology import z_at_value
 from numpy.typing import NDArray
 
 from .cosmology import cosmo
-from .gureft import halo_mass_accretion_rate as dmhdt_gureft
+from .halo import halo_mass_accretion_rate
 
 
 def halo_to_stellar_mass(
@@ -104,7 +104,7 @@ def star_formation_history(
             cosmo.age, (cosmo.age(redshift).value - 1e-3 * time_step * i) * apu.Gyr, method="bounded"
         ).value
         reds_arr.append(reds)
-        sfr_val = eps * fb * dmhdt_gureft(halo_mass, reds) * (halo_mass / 1e10) ** alpha
+        sfr_val = eps * fb * halo_mass_accretion_rate(halo_mass, reds, method="GUREFT") * (halo_mass / 1e10) ** alpha
         sfh_z.append(sfr_val)
         log_mst.append(np.log10(time_step * 1e6 * np.sum(sfh_z)))
         i += 1
