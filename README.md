@@ -2,12 +2,12 @@
 
 This repository contains a set of Python scripts used to model the formation and dust properties of high-redshift galaxies, focusing on their UV and IR luminosities and how these are affected by the structure, geometry, and turbulence of the interstellar medium (ISM).
 
-Current paper draft: https://www.overleaf.com/read/kccngwhxtzfh#15f262
+Current paper draft: https://www.overleaf.com/read/rsnzrzvdkyvm#bbf2a2
 
 -- Repository Structure
 
 * dust_JWST_z10_GSD.py
-Computes absorption, extinction etc., starting from grain size distribution (silicates, carbon and PAH dust). values derived here are then used in the rest of the scripts wherever dust attenuation/emission is computed (specifically kuv_abs etc in the dust model section)
+Computes absorption, extinction etc., starting from grain size distribution (silicates, carbon and PAH dust). values derived here are then used in the rest of the scripts wherever dust attenuation/emission is computed 
 
 * highz_gal_SAM.py
 Core module containing all the functions used to populate the halo mass function (HMF) with galaxies.
