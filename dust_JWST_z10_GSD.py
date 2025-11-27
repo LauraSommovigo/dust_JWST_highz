@@ -1,4 +1,5 @@
 
+from astropy.table import pprint
 from scipy.integrate import quad
 from matplotlib import cm
 col_f = cm.get_cmap('gray')
@@ -221,6 +222,8 @@ radii_c, wavelength_c, Qabs_c, Qsca_c, g_c = read_draine_table_carb_sil(
 radii_s, wavelength_s, Qabs_s, Qsca_s, g_s = read_draine_table_carb_sil(
     "/Users/lsommovigo/Desktop/Scripts/txt_files/Dust_Draine/silicate_dust.txt"
 )
+
+
 
 
 #-- NOW: show large grains are less UV absorbing than small grains 
@@ -566,10 +569,7 @@ omega_tot     = kappa_sca_tot / kappa_ext_tot          # albedo ω(λ)
 
 
 
-
 lam_A = wavelength_c * 1e4   # µm → Å
-
-
 plt.figure(figsize=(7,5))
 
 plt.loglog(lam_A, kappa_c_abs,  color='indigo',     alpha=0.6, label='Carbonaceous')
@@ -805,7 +805,6 @@ ax.text(1550., ax.get_ylim()[0]*1.2,
         r'$\lambda=1500\,$Å', fontsize=12, color='gray')
 
 
-
 ax.set_xscale('log')
 ax.set_yscale('log')
 ax.set_ylim(25, 2e5) 
@@ -814,6 +813,7 @@ ax.set_xlabel(r'$\lambda\ [\mathrm{\AA}]$')
 ax.set_ylabel(r'$\kappa_{\lambda}\ [{\rm cm}^2\,{\rm g}^{-1}]$')
 ax.grid(True, alpha=0.2, lw=0.5)
 ax.legend(frameon=False, fontsize=16, loc='lower left')
+
 
 # ==========================================================
 # INSET: 1e29 * a^4 dn/da for WD01 vs stellar dust
@@ -877,3 +877,401 @@ print("\n==== κ_tot(V band) results ====")
 print(f"MW WD01 dust (ext)     : {kv_drn} cm^2 g^-1")
 print(f"Stellar dust model (ext): {kv_hir} cm^2 g^-1")
 print("=========================================================\n")
+
+
+
+
+
+# -------------------------------------------------------------------
+# 4. Radiative transfer attenuation curves
+# -------------------------------------------------------------------
+# We will implement three geometries:
+## -- ok now we want to show what is the difference between the mw extinction curve 
+# vs. the attanuation curve that we build here via tramission function + the change in GSD and thus in kappa_lambda
+# and we compare with the TNG results from Sommovigo+25
+# 1) Slab geometry with scattering (Henyey-Greenstein)
+# 2) Spherical shell geometry with central source (Code 1973)
+# 3) Spherical geometry with stars mixed with dust (no scattering term)
+
+
+def T_slab(tau_lambda, mu, omega_lambda):
+    """
+    Slab geometry with scattering (Henyey-Greenstein).
+    Parameters
+    ----------
+    tau_lambda : array
+        Optical depth at each wavelength.
+    mu : float
+        cosine of inclination (0 < mu <= 1)
+    omega_lambda : array
+        albedo at each wavelength.
+    """
+    # argument x = (1 - omega) * tau / (2 mu)
+    x = (1. - omega_lambda) * tau_lambda / (2. * mu)
+    return (1./mu) * np.exp(-x) * W_l(x)
+
+
+def T_sphere_central(tau_lambda, omega_lambda, g_lambda=0):
+    """
+    Spherical shell geometry with central source (Code 1973).
+    Includes anisotropic scattering.
+    """
+    eta = np.sqrt((1. - omega_lambda) / (1. - omega_lambda * g_lambda))
+    psi = np.sqrt((1. - omega_lambda) * (1. - omega_lambda * g_lambda))
+
+    return 2.0 / ((1. + eta) * np.exp(psi * tau_lambda) +
+                  (1. - eta) * np.exp(-psi * tau_lambda))
+
+
+def T_sphere_mixed(tau_lambda):
+    """
+    Spherical geometry with stars mixed with dust.
+    No scattering term (pure absorption + geometric factor).
+    """
+    return (3./(4.*tau_lambda) *
+            (1. - 1./(2*tau_lambda**2) +
+             (1./tau_lambda + 1./(2*tau_lambda**2)) * np.exp(-2.*tau_lambda)))
+
+
+def compute_g_lambda(wavelength_um, radii_um, Qsca_table, g_sca_table, dn_da):
+    """
+    Compute scattering asymmetry parameter g_lambda averaged over size distribution.
+
+    wavelength_um : (Nλ,)
+    radii_um      : (Na,)
+    Qsca_table    : (Na, Nλ)   scattering efficiency Q_sca(a, λ)
+    g_sca_table   : (Na, Nλ)   <cos θ> for each (a, λ)
+    dn_da         : (Na,)      size distribution (any normalization; cancels out)
+
+    Returns
+    -------
+    g_lambda : (Nλ,)   scattering asymmetry parameter at each λ.
+    """
+    a_cm = radii_um * 1e-4
+    da   = np.gradient(a_cm)
+
+    # weight ∝ π a^2 Q_sca dn/da
+    weight = np.pi * a_cm[:, None]**2 * Qsca_table * dn_da[:, None]  # (Na, Nλ)
+
+    num   = np.sum(weight * g_sca_table * da[:, None], axis=0)   # ∫ π a^2 Q_sca g dn/da da
+    denom = np.sum(weight * da[:, None],                axis=0)   # ∫ π a^2 Q_sca   dn/da da
+
+    g_lambda = num / denom
+    return g_lambda
+
+#for MW dust mixture
+g_tot = compute_g_lambda(lam_um, radii_c, Qsca_c, g_c, dn_da_C) * (1./11.) + \
+        compute_g_lambda(lam_um, radii_s, Qsca_s, g_s, dn_da_Si) * (10./11.)
+
+def attenuation_curve_RT(lam_um, kappa_ext, omega_lam, g_lam, Sigmad, geometry="sphere_central", mu=0.6):
+    """
+    Compute A_lambda [mag] for a given dust column and geometry.
+
+    lam_um    : (Nλ,) wavelengths [micron]
+    kappa_ext : (Nλ,) total extinction opacity [cm^2/g]
+    omega_lam : (Nλ,) albedo
+    g_lam     : (Nλ,) asymmetry parameter
+    Sigmad    : float, dust surface density [g/cm^2]
+    geometry  : "sphere_central", "sphere_mixed", or "slab"
+    mu        : slab inclination cosine (if geometry="slab")
+    """
+    tau = kappa_ext * Sigmad
+
+    if geometry == "sphere_central":
+        T = T_sphere_central(tau, omega_lam, g_lam)
+    elif geometry == "sphere_mixed":
+        T = T_sphere_mixed(tau)
+    elif geometry == "slab":
+        T = T_slab(tau, mu=mu, omega_lambda=omega_lam)
+    else:
+        raise ValueError("Unknown geometry")
+
+    return -2.5 * np.log10(T)
+
+
+# we compare to TNG+RT results from Sommovigo+25
+def attenuation_s25(lam_um, AV):
+    """
+    Compute A_lambda for the Sommovigo+2025 parametric attenuation model.
+    lam_um : array in micron
+    AV     : float
+    """
+    log_c1 = -0.37 * np.log10(AV) + 0.75
+    c1     = 10**log_c1
+    c2     = 1.88
+    c3     = 1.21 * log_c1 - 1.33
+    log_c4 = -0.59 * np.log10(AV) - 1.42
+    c4     = 10**log_c4
+
+    # Your existing function for attenuation curve shape:
+    A_lam_Av = Li_08(lam_um, c1, c2, c3, c4, model="modified")
+    
+    return A_lam_Av     # This is already A_lambda/Av
+
+
+# --- wavelength grid in Å for plotting ---
+lam_ang = lam_um * 1e4      # micron -> Angstrom
+
+# indices for V band (~5500 Å) and UV (~1500 Å)
+lam_V  = 5500.0
+lam_UV = 1500.0
+i_V  = np.argmin(np.abs(lam_ang - lam_V))
+i_UV = np.argmin(np.abs(lam_ang - lam_UV))
+
+# --- choose three test Σ_d values in g/cm^2 ---
+Sigmad_values = [1e-5, 1e-4, 1e-3]   # g/cm^2
+colors = [plt.cm.magma_r(0.1), plt.cm.magma_r(0.51), plt.cm.magma_r(1.) ]
+
+'''
+
+fig, ax = plt.subplots(figsize=(6, 5))
+
+for Sigmad, col in zip(Sigmad_values, colors):
+    # compute attenuation curve for this Σ_d, spherical central source geometry
+    A_lam = attenuation_curve_RT(
+        lam_um,
+        kappa_ext_tot,   # κ_ext(λ) [cm^2/g]
+        omega_tot,       # ω(λ)
+        g_tot,           # g(λ)
+        Sigmad,               # Σ_d [g/cm^2]
+        geometry="sphere_central"
+    )
+
+    # normalize by A_V
+    A_V  = A_lam[i_V]
+    A_UV = A_lam[i_UV]
+    ratio = A_UV / A_V
+
+    print(f"\n\n Σ_d = {Sigmad:.2e} g/cm^2  -->  A_1500/A_V = {ratio:.2f}")
+
+    A_norm = A_lam / A_V
+    ax.plot(lam_ang, A_norm, color=col, lw=2,
+            label=fr'PS , $A_V$={A_V:.2f}')
+    
+    # sphere mixed geometry for same Σ_d
+    A_lam_mixed = attenuation_curve_RT(
+        lam_um,
+        kappa_ext_tot,   # κ_ext(λ) [cm^2/g]
+        omega_tot,       # ω(λ)
+        g_tot,           # g(λ)
+        Sigmad,               # Σ_d [g/cm^2]
+        geometry="sphere_mixed"
+    )       
+
+    A_V_mixed  = A_lam_mixed[i_V]
+    A_UV_mixed = A_lam_mixed[i_UV]
+    ratio_mixed = A_UV_mixed / A_V_mixed
+    print(f" Sphere mixed geometry: A_1500/A_V = {ratio_mixed:.2f}")
+    A_norm_mixed = A_lam_mixed / A_V_mixed
+    ax.plot(lam_ang, A_norm_mixed, color=col, lw=2, ls=':',
+            label=fr'Mix, $A_V$={A_V_mixed:.2f}')
+
+    # slab geometry for same Σ_d
+    A_lam_slab = attenuation_curve_RT(
+        lam_um,
+        kappa_ext_tot,   # κ_ext(λ) [cm^2/g]
+        omega_tot,       # ω(λ)
+        g_tot,           # g(λ)
+        Sigmad,               # Σ_d [g/cm^2]
+        geometry="slab",
+        mu=0.6
+    )   
+
+    A_V_slab  = A_lam_slab[i_V]
+    A_UV_slab = A_lam_slab[i_UV]
+    ratio_slab = A_UV_slab / A_V_slab
+    print(f" Slab geometry: A_1500/A_V = {ratio_slab:.2f}")
+    A_norm_slab = A_lam_slab / A_V_slab
+    #ax.plot(lam_ang, A_norm_slab, color=col, lw=2, ls='-.',
+    #        label=fr'Slab, A$_{{1500}}$/A$_V$={ratio_slab:.2f}')    
+    
+
+    # Sommovigo+25 model for same A_V values
+    # compute A_V for this Σ_d using MW WD01 κ_ext at V band
+    A_V = kappa_ext_tot[i_V] * Sigmad * (2.5 / np.log(10))   # mag
+    print(f" Corresponding A_V = {A_V:.3f} mag")
+
+    A_lam_Av_s25 = attenuation_s25(lam_um, A_V)
+
+    ratio_s25 = A_lam_Av_s25[i_UV] / A_V
+
+    ax.plot(lam_ang,A_lam_Av_s25, color=col, lw=2, ls='--',
+            label=fr'Sommovigo+25, $A_V$={A_V:.2f}')
+
+# plot MW extinction curve for reference
+ax.plot(lam_ang, Li_08(1e-4*lam_ang,0.,0.,0.,0.,'MW'), color='gray', lw=6, label='MW', alpha=0.3)
+
+# cosmetics
+# mark 1500 Å and V band
+ax.axvline(lam_UV, color='royalblue', linestyle='--', lw=2, alpha=0.5)
+ax.axvline(lam_V,  color='royalblue', linestyle=':',  lw=2, alpha=0.5)
+ax.text(lam_UV*1.05, 0.1, r'$1500\,$Å', color='royalblue', fontsize=12)
+ax.text(lam_V*1.02,  0.1, r'$V$',      color='royalblue', fontsize=12)
+
+ax.set_xlabel(r"$\lambda [\dot{A}]$", fontsize=18)
+ax.set_ylabel(r"A$_{\lambda}/$A$_{V}$", fontsize=18)
+ax.grid(alpha=0.4,ls='--')
+#plt.legend(fontsize=11,frameon=True,ncols=3,loc=(-0.1,1.05))
+#Chosen ticks: Bump, poi FILTERS: UV: U;     Visible: R;     NIR: Z, Y, J, H, K
+ax.set_xticks([2175., 4450., 6580., 9000.,10200., 12200., 16300., 21900.])
+ax.set_ylim(0,10)
+ax.set_xlim(1e3,9e3)
+ax.legend(loc='best',fontsize=14)
+plt.show()
+
+'''
+
+
+
+
+
+#-------------------------------------------------------------------------------------------
+#--------- New plot for the paper: attenuationc curve compairson, stellar dust and MW dust
+#-------------------------------------------------------------------------------------------
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+ax_mw, ax_stellar = axes
+
+# Helper: Σ_d from desired A_V
+def sigmad_from_Av(Av_target, kappa_V):
+    # A_V = kappa_V * Σ_d * (2.5 / ln10)
+    return Av_target / (kappa_V * (2.5 / np.log(10)))
+
+# Common A_V values and corresponding line widths
+Av_values = [0.15, 4.0]
+alpha_map = {0.15: 0.3, 4.0: 0.6}   # thin vs thick
+lw_map = {0.15: 1.5, 4.0: 2.5}   # thin vs thick
+
+def plot_family(ax, kappa_ext_tot, omega_tot, g_tot,
+                color, title):
+    """
+    Plot PS, mixed, Sommovigo+24 for A_V = 0.1 and 1.0
+    using the given dust model (kappa_ext_tot, omega_tot, g_tot).
+    """
+    kappa_V = kappa_ext_tot[i_V]
+
+    for Av in Av_values:
+        transp = alpha_map[Av]
+        lw = lw_map[Av]
+
+        # Convert desired A_V at V band to Σ_d
+        Sigmad = sigmad_from_Av(Av, kappa_V)
+
+        # --- PS (sphere_central) ---
+        A_lam_ps = attenuation_curve_RT(
+            lam_um,
+            kappa_ext_tot,
+            omega_tot,
+            g_tot,
+            Sigmad,
+            geometry="sphere_central",
+        )
+        A_norm_ps = A_lam_ps / A_lam_ps[i_V]
+
+        # Label only for A_V = 1
+        label_ps = rf"PS, $A_V={Av:.1f}$" #if np.isclose(Av, 1.0) else None
+
+        ax.plot(
+            lam_ang,
+            A_norm_ps,
+            color=color,
+            lw=lw,
+            ls='-',
+            alpha=transp,
+            label=label_ps
+        )
+
+        # --- Mixed (sphere_mixed) ---
+        A_lam_mix = attenuation_curve_RT(
+            lam_um,
+            kappa_ext_tot,
+            omega_tot,
+            g_tot,
+            Sigmad,
+            geometry="sphere_mixed",
+        )
+        A_norm_mix = A_lam_mix / A_lam_mix[i_V]
+
+        label_mix = r"Mix" #if np.isclose(Av, 1.0) else None
+
+        ax.plot(
+            lam_ang,
+            A_norm_mix,
+            color=color,
+            lw=lw,
+            ls=':',
+            alpha=transp,
+            label=label_mix
+        )
+
+        # --- Sommovigo+24 model ---
+        # attenuation_s25 returns A_lambda for a given A_V
+        A_norm_s24 = attenuation_s25(lam_um, Av)
+
+        label_s24 = r"Sommovigo+25" #if np.isclose(Av, 1.0) else None
+
+        if title=="MW dust":
+            ax.plot(
+            lam_ang,
+            A_norm_s24,
+            color=color,
+            lw=lw,
+            ls='--',
+            alpha=transp,
+            label=label_s24
+            )
+
+    # Cosmetics per panel
+    ax.set_title(title, fontsize=15)
+    ax.set_xlabel(r"$\lambda\,[\mathrm{\AA}]$", fontsize=16)
+    ax.grid(alpha=0.4, ls='--')
+
+# ===== LEFT PANEL: MW dust (crimson) =====
+plot_family(
+    ax=ax_mw,
+    kappa_ext_tot=kappa_ext_tot,
+    omega_tot=omega_tot,
+    g_tot=g_tot,
+    color='crimson',
+    title="MW dust"
+)
+
+# MW extinction curve for reference (only on MW panel)
+ax_mw.plot(
+    lam_ang,
+    Li_08(1e-4 * lam_ang, 0., 0., 0., 0., 'MW'),
+    color='gray',
+    lw=6,
+    label='MW Ext. Curve (Li+08)',
+    alpha=0.3
+)
+
+# ===== RIGHT PANEL: Stellar dust (teal) =====
+plot_family(
+    ax=ax_stellar,
+    kappa_ext_tot=kappa_ext_star_tot,
+    omega_tot=omega_star_tot,
+    g_tot=g_tot,
+    color='teal',
+    title="Stellar dust"
+)
+
+# ===== Common cosmetics =====
+for ax in axes:
+    # Mark 1500 Å and V band
+    ax.axvline(lam_UV, color='royalblue', linestyle='--', lw=1.5, alpha=0.6)
+    ax.axvline(lam_V,  color='royalblue', linestyle=':',  lw=1.5, alpha=0.6)
+    ax.text(lam_UV * 1.05, 0.5, r'$1500\,$Å', color='royalblue', fontsize=11)
+    ax.text(lam_V * 1.02,  0.5, r'$V$',       color='royalblue', fontsize=11)
+
+    ax.set_xticks([2175., 4450., 6580., 9000., 10200., 12200., 16300., 21900.])
+    ax.set_xlim(1e3, 9e3)
+
+axes[0].set_ylabel(r"$A_{\lambda}/A_V$", fontsize=16)
+axes[0].set_ylim(0, 10)
+
+# Put legend on the right panel only (labels only for A_V=1)
+ax_mw.legend(loc='best', fontsize=12, frameon=False)
+
+plt.tight_layout()
+plt.show()
