@@ -1,0 +1,323 @@
+# Grain Size Distribution Parameter Values
+#
+# Reference: Weingartner & Draine (2001, ApJ, 548, 296)
+# "Dust Grain-Size Distributions and Extinction in the Milky Way,
+#  Large Magellanic Cloud, and Small Magellanic Cloud"
+# DOI: 10.1086/318651
+# arXiv: astro-ph/0008146
+# ADS: https://ui.adsabs.harvard.edu/abs/2001ApJ...548..296W
+#
+# Values from Table 1 of Weingartner & Draine (2001)
+# parameter level order
+# RV = A(V )/EB−V , ratio of visual extinction to reddening
+# case: A or B
+# bC: C abundance in double log-normal very small grain population (see equations 2 and 3)
+# species: graphite or silicate
+'3.1':
+  A:
+  - bC: 0.0
+    graphite:
+      alpha: -2.25
+      beta: -0.0648
+      at: 0.00745
+      ac: 0.606
+      c: 9.94e-11
+    silicate:
+      alpha: -1.48
+      beta: -9.34
+      at: 0.172
+      c: 1.02e-12
+  - bC: 1.0
+    graphite:
+      alpha: -2.17
+      beta: -0.0382
+      at: 0.00373
+      ac: 0.586
+      c: 3.79e-10
+    silicate:
+      alpha: -1.46
+      beta: -10.3
+      at: 0.174
+      c: 1.09e-12
+  - bC: 2.0
+    graphite:
+      alpha: -2.04
+      beta: -0.111
+      at: 0.00828
+      ac: 0.543
+      c: 5.57e-11
+    silicate:
+      alpha: -1.43
+      beta: -11.7
+      at: 0.173
+      c: 1.27e-12
+  - bC: 3.0
+    graphite:
+      alpha: -1.91
+      beta: -0.125
+      at: 0.00837
+      ac: 0.499
+      c: 4.15e-11
+    silicate:
+      alpha: -1.41
+      beta: -11.5
+      at: 0.171
+      c: 1.33e-12
+  - bC: 4.0
+    graphite:
+      alpha: -1.84
+      beta: -0.132
+      at: 0.00898
+      ac: 0.489
+      c: 2.9e-11
+    silicate:
+      alpha: -2.1
+      beta: -0.14
+      at: 0.169
+      c: 1.26e-13
+  - bC: 5.0
+    graphite:
+      alpha: -1.72
+      beta: -0.322
+      at: 0.0254
+      ac: 0.438
+      c: 3.32e-12
+    silicate:
+      alpha: -2.1
+      beta: -0.0407
+      at: 0.166
+      c: 1.27e-13
+  - bC: 6.0
+    graphite:
+      alpha: -1.54
+      beta: -0.165
+      at: 0.0107
+      ac: 0.428
+      c: 9.99e-12
+    silicate:
+      alpha: -2.21
+      beta: 0.3
+      at: 0.164
+      c: 1.0e-13
+'4.0':
+  A:
+  - bC: 0.0
+    graphite:
+      alpha: -2.26
+      beta: -0.199
+      at: 0.0241
+      ac: 0.861
+      c: 5.47e-12
+    silicate:
+      alpha: -2.03
+      beta: 0.668
+      at: 0.189
+      c: 5.2e-14
+  - bC: 1.0
+    graphite:
+      alpha: -2.16
+      beta: -0.0862
+      at: 0.00867
+      ac: 0.803
+      c: 4.58e-11
+    silicate:
+      alpha: -2.05
+      beta: 0.832
+      at: 0.188
+      c: 4.81e-14
+  - bC: 2.0
+    graphite:
+      alpha: -2.01
+      beta: -0.0973
+      at: 0.00811
+      ac: 0.696
+      c: 3.96e-11
+    silicate:
+      alpha: -2.06
+      beta: 0.995
+      at: 0.185
+      c: 4.7e-14
+  - bC: 3.0
+    graphite:
+      alpha: -1.83
+      beta: -0.175
+      at: 0.0117
+      ac: 0.604
+      c: 1.42e-11
+    silicate:
+      alpha: -2.08
+      beta: 1.29
+      at: 0.184
+      c: 4.26e-14
+  - bC: 4.0
+    graphite:
+      alpha: -1.64
+      beta: -0.247
+      at: 0.0152
+      ac: 0.536
+      c: 5.83e-12
+    silicate:
+      alpha: -2.09
+      beta: 1.58
+      at: 0.183
+      c: 3.94e-14
+  B:
+  - bC: 0.0
+    graphite:
+      alpha: -2.62
+      beta: -0.0144
+      at: 0.0187
+      ac: 5.74
+      c: 6.4e-12
+    silicate:
+      alpha: -2.01
+      beta: 0.894
+      at: 0.198
+      c: 4.95e-14
+  - bC: 1.0
+    graphite:
+      alpha: -2.52
+      beta: -0.0541
+      at: 0.0366
+      ac: 6.65
+      c: 1.08e-12
+    silicate:
+      alpha: -2.11
+      beta: 1.58
+      at: 0.197
+      c: 3.69e-14
+  - bC: 2.0
+    graphite:
+      alpha: -2.36
+      beta: -0.0957
+      at: 0.0305
+      ac: 6.44
+      c: 1.62e-12
+    silicate:
+      alpha: -2.05
+      beta: 1.19
+      at: 0.197
+      c: 4.37e-14
+  - bC: 3.0
+    graphite:
+      alpha: -2.09
+      beta: -0.193
+      at: 0.0199
+      ac: 4.6
+      c: 4.21e-12
+    silicate:
+      alpha: -2.1
+      beta: 1.64
+      at: 0.198
+      c: 3.63e-14
+  - bC: 4.0
+    graphite:
+      alpha: -1.96
+      beta: -0.813
+      at: 0.0693
+      ac: 3.48
+      c: 2.95e-12
+    silicate:
+      alpha: -2.11
+      beta: 0.996
+      at: 0.199
+      c: 3.13e-14
+'5.5':
+  A:
+  - bC: 0.0
+    graphite:
+      alpha: -2.35
+      beta: -0.668
+      at: 0.148
+      ac: 1.96
+      c: 4.82e-14
+    silicate:
+      alpha: -1.57
+      beta: 1.1
+      at: 0.198
+      c: 4.24e-14
+  - bC: 1.0
+    graphite:
+      alpha: -2.12
+      beta: -0.67
+      at: 0.0686
+      ac: 1.35
+      c: 3.65e-13
+    silicate:
+      alpha: -1.57
+      beta: 1.25
+      at: 0.197
+      c: 4.0e-14
+  - bC: 2.0
+    graphite:
+      alpha: -1.94
+      beta: -0.853
+      at: 0.0786
+      ac: 0.921
+      c: 2.57e-13
+    silicate:
+      alpha: -1.55
+      beta: 1.33
+      at: 0.195
+      c: 4.05e-14
+  - bC: 3.0
+    graphite:
+      alpha: -1.61
+      beta: -0.722
+      at: 0.0418
+      ac: 0.72
+      c: 7.58e-13
+    silicate:
+      alpha: -1.59
+      beta: 2.12
+      at: 0.193
+      c: 2.61e-14
+  B:
+  - bC: 0.0
+    graphite:
+      alpha: -2.8
+      beta: 0.0356
+      at: 0.0203
+      ac: 3.43
+      c: 2.74e-12
+    silicate:
+      alpha: -1.09
+      beta: -0.37
+      at: 0.218
+      c: 1.17e-13
+  - bC: 1.0
+    graphite:
+      alpha: -2.67
+      beta: 0.0129
+      at: 0.0134
+      ac: 3.44
+      c: 7.27e-12
+    silicate:
+      alpha: -1.14
+      beta: -0.195
+      at: 0.216
+      c: 1.05e-13
+  - bC: 2.0
+    graphite:
+      alpha: -2.45
+      beta: -0.00132
+      at: 0.0275
+      ac: 5.14
+      c: 8.79e-13
+    silicate:
+      alpha: -1.08
+      beta: -0.336
+      at: 0.216
+      c: 1.17e-13
+  - bC: 3.0
+    graphite:
+      alpha: -1.9
+      beta: -0.0517
+      at: 0.012
+      ac: 7.28
+      c: 2.86e-12
+    silicate:
+      alpha: -1.13
+      beta: -0.109
+      at: 0.211
+      c: 1.04e-13
