@@ -1,13 +1,140 @@
+from typing import Callable
+
 import astropy.constants as apc
 import numpy as np
 from numpy.typing import NDArray
 from scipy.integrate import quad
+from scipy.special import erf
 
 from .cosmology import cosmo
 from .halo import virial_radius
 
+ANGSTROM = 1e-8  # cm
 
-def grain_mass_cgs(
+
+def small_carbonaceous_grain_dist(
+    radius: float | NDArray[np.floating], bc: float, sigma: float = 0.4
+) -> NDArray[np.floating]:
+    """Calculate very small carbonaceous grain size distribution.
+
+    Computes the number density per unit size interval for very small carbonaceous
+    grains (VSGs), including polycyclic aromatic hydrocarbons (PAHs), following
+    Weingartner & Draine (2001) equations (2)-(3). The distribution is a sum of
+    two log-normal components centered at 3.5 Å and 30 Å.
+
+    Parameters
+    ----------
+    radius : float or ndarray
+        Grain radius in cm. Must be positive.
+    bc : float
+        Carbon abundance parameter in very small grains (dimensionless).
+        Typical values range from 0 (no VSGs) to 6e-5 (Milky Way).
+        This sets the overall amplitude of the VSG population.
+    sigma : float, optional
+        Width parameter for the log-normal distributions (dimensionless).
+        Default is 0.4, as adopted by Weingartner & Draine (2001).
+
+    Returns
+    -------
+    float or ndarray
+        Very small grain size distribution D(a) = (1/n_H) dn/da in cm⁻¹,
+        where n_H is the hydrogen number density. Same shape as input radius.
+        Returns 0 for radii below 3.5 Å.
+
+    Notes
+    -----
+    The distribution is given by a sum of two log-normal components:
+
+        D(a) = Σᵢ (Bᵢ/a) exp[-½((ln(a/a₀ᵢ))/σ)²]
+
+    where:
+    - a₀₁ = 3.5 Å and a₀₂ = 30 Å are the centers of the two components
+    - bc is split as bc₁ = 0.75×bc and bc₂ = 0.25×bc between the components
+    - Bᵢ is a normalization factor computed from bc and grain properties
+
+    The distribution only applies for a > 3.5 Å; for smaller radii, D(a) = 0.
+
+    References
+    ----------
+    Weingartner, J. C., & Draine, B. T. 2001, ApJ, 548, 296
+    "Dust Grain-Size Distributions and Extinction in the Milky Way,
+    Large Magellanic Cloud, and Small Magellanic Cloud"
+
+    See Also
+    --------
+    grain_size_dist : Full grain size distribution including large grains
+
+
+    """
+    mp = 1.67262192e-24
+    mc = 12.0 * mp
+    rho_graphite = 2.24  # g cm^-3
+
+    a = np.asarray(radius, dtype=float)
+    # log-normal centers in cm
+    a0_1 = 3.5 * ANGSTROM
+    a0_2 = 30.0 * ANGSTROM
+    a0 = np.array([a0_1, a0_2])
+
+    # split bc into two components
+    bc_i = np.array([0.75 * bc, 0.25 * bc])
+
+    pref = 3.0 / ((2.0 * np.pi) ** 1.5)
+
+    x0 = a0 / (3.5 * ANGSTROM)
+    arg = 3.0 * sigma / np.sqrt(2.0) + np.log(x0) / (sigma * np.sqrt(2.0))
+    denom = 1.0 + erf(arg)
+
+    bi = pref * np.exp(-4.5 * sigma**2) / (rho_graphite * a0**3 * sigma) * (bc_i * mc / denom)
+
+    dist = np.zeros_like(a)
+    mask = a > 3.5 * ANGSTROM
+    a_pos = a[mask]
+    if a_pos.size > 0:
+        a_ratio = np.log(a_pos[None, :] / a0[:, None]) / sigma
+        gauss = np.exp(-0.5 * a_ratio**2)
+        dist[mask] = np.sum(bi[:, None] / a_pos[None, :] * gauss, axis=0)
+
+    return dist
+
+
+def mass_absorption_coefficient(
+    radius: float | NDArray[np.floating],
+    q_abs: float | NDArray[np.floating],
+    density: float | NDArray[np.floating] = 3.5,
+) -> float | NDArray[np.floating]:
+    """Calculate the mass absorption coefficient (kappa) for dust grains.
+
+    Parameters
+    ----------
+    radius : float or ndarray
+        Grain radius in cm.
+    q_abs : float or ndarray
+        Absorption efficiency factor (dimensionless).
+    density : float or ndarray, optional
+        Grain density in g/cm^3. Default is 3.5 g/cm^3 (silicate).
+
+    Returns
+    -------
+    float or ndarray
+        Mass absorption coefficient in cm^2/g.
+
+    Notes
+    -----
+    The mass absorption coefficient is computed as::
+
+        κ = (σ_abs) / m = (π * r^2 * Q_abs) / m
+
+    where σ_abs is the absorption cross section, m is the grain mass,
+    r is the grain radius, and Q_abs is the absorption efficiency.
+
+    """
+    mass = grain_mass(radius, density)
+    sigma_abs = np.pi * radius**2 * q_abs
+    return sigma_abs / mass
+
+
+def grain_mass(
     radius: float | NDArray[np.floating], density: float | NDArray[np.floating] = 3.5
 ) -> float | NDArray[np.floating]:
     """Calculate the mass of a spherical dust grain.
@@ -28,50 +155,172 @@ def grain_mass_cgs(
     return (4.0 / 3.0) * np.pi * radius**3 * density
 
 
-def grain_size_dist(radius: float) -> float:
-    """Calculate grain size distribution from Draine+03 for MW-like silicates.
+def grain_size_dist(
+    radius: float | NDArray[np.floating],
+    c: float,
+    at: float,
+    ac: float,
+    alpha: float,
+    beta: float,
+    d_func: Callable | None = None,
+) -> NDArray[np.floating]:
+    """Calculate grain size distribution following Weingartner & Draine (2001).
+
+    Computes the number density of dust grains per unit size interval, (1/n_H) dn/da,
+    combining a power-law distribution for larger grains with an optional component
+    for very small grains (e.g., PAHs). The large grain component includes curvature
+    corrections and an exponential cutoff above the transition radius.
 
     Parameters
     ----------
-    radius : float
-        Grain size in cm.
+    radius : float or ndarray
+        Grain radius in cm.
+    c : float
+        Normalization constant C for the power-law component (dimensionless).
+        This sets the overall amplitude of the large grain distribution.
+    at : float
+        Transition radius in cm where the exponential cutoff begins.
+        Typical values are ~0.1 μm (1e-5 cm) for Milky Way dust.
+    ac : float
+        Cutoff width in cm controlling the sharpness of the exponential cutoff.
+        Smaller values lead to a sharper cutoff above a_t.
+    alpha : float
+        Power-law index for the grain size distribution (dimensionless).
+        The distribution scales as a^(alpha-1). Typical values range from
+        -1.5 to -2.5, with more negative values favoring smaller grains.
+    beta : float
+        Curvature parameter modifying the power-law slope (dimensionless).
+        Positive beta steepens the distribution for a > a_t, while negative
+        beta flattens it. Set to 0 for no curvature correction.
+    d_func : callable or None, optional
+        Function to compute very small grain component D(a) (e.g., for PAHs).
+        Must accept radius in cm and return (1/n_H) dn/da in cm^-1.
+        If None, only the large grain component is computed. Default is None.
 
     Returns
     -------
-    float
-        Number density of grains per unit size interval at size radius.
+    ndarray
+        Grain size distribution (1/n_H) dn/da in cm^-1, where n_H is the
+        hydrogen number density. Same shape as input radius.
 
     Notes
     -----
-    This implements the grain size distribution from Draine & Li (2003)
-    for Milky Way-like silicate dust grains. The distribution has a power-law
-    form for small grains (radius ≤ ats) and an exponential cutoff for larger grains.
+    The distribution is given by:
+
+        dn/da = D(a) + (C/a_t^α) * a^(α-1) * F(a; β, a_t) * exp(-((a-a_t)/a_c)³)
+
+    where:
+    - D(a) is the very small grain component (if d_func is provided)
+    - The second term is the power-law component with curvature F and exponential cutoff
+    - The exponential cutoff only applies for a > a_t
+
+    This formulation is equivalent to Weingartner & Draine (2001) equations (4)-(5),
+    which describe the grain size distribution for carbonaceous and silicate grains
+    in the Milky Way.
 
     References
     ----------
-    Draine, B. T., & Li, A. 2003, ApJ, 598, 1017
+    Weingartner, J. C., & Draine, B. T. 2001, ApJ, 548, 296
+    "Dust Grain-Size Distributions and Extinction in the Milky Way,
+    Large Magellanic Cloud, and Small Magellanic Cloud"
+
+    See Also
+    --------
+    f_curvature : Curvature correction function F(a; β, a_t)
 
     """
-    cs = 1.02e-12
-    ats = 0.172e-4  # cm
-    alphas = -1.48
-    bs = -9.34
-    acs = 0.1e-4  # cm
-
-    power_dist = (cs / ats**alphas) * radius ** (alphas - 1) / (1 - bs * radius / ats)
-    if radius <= ats:
-        return power_dist
+    radius = np.asarray(radius, dtype=float)
+    if d_func is None:
+        d_small = 0
     else:
-        return power_dist * np.exp(-(((radius - ats) / acs) ** 3))
+        d_small = d_func(radius)
+
+    curv = f_curvature(radius, beta, at)
+    exp_cutoff = np.ones_like(radius)
+    mask = radius > at
+    exp_cutoff[mask] = np.exp(-(((radius[mask] - at) / ac) ** 3))
+
+    d_big = (c / at**alpha) * radius ** (alpha - 1) * curv * exp_cutoff
+
+    return d_small + d_big
 
 
-def mass_weighted_grain_size_dist(radius: float) -> float:
+def f_curvature(
+    a: float | NDArray[np.floating],
+    beta: float,
+    a_t: float,
+) -> float | NDArray[np.floating]:
+    """Calculate curvature correction factor for grain size distribution.
+
+    Computes the curvature term F(a; β, a_t) from Weingartner & Draine (2001)
+    equation (6), which modifies the power-law slope of the grain size
+    distribution as a function of grain radius.
+
+    Parameters
+    ----------
+    a : float or ndarray
+        Grain radius in cm.
+    beta : float
+        Curvature parameter (dimensionless). Controls how the power-law
+        slope changes with grain size:
+        - β > 0: Distribution steepens for a > a_t (favors smaller grains)
+        - β = 0: No curvature correction (pure power law)
+        - β < 0: Distribution flattens for a > a_t (favors larger grains)
+        Typical values for Milky Way dust range from -0.1 to 0.1.
+    a_t : float
+        Transition radius in cm where the curvature correction is normalized.
+        This is typically the same as the exponential cutoff radius.
+
+    Returns
+    -------
+    float or ndarray
+        Curvature correction factor F(a; β, a_t) (dimensionless).
+        Same shape as input `a`. Values are typically close to 1.
+
+    Notes
+    -----
+    The curvature factor is defined as:
+
+    - For β ≥ 0:  F(a; β, a_t) = 1 + β * (a / a_t)
+    - For β < 0:  F(a; β, a_t) = 1 / [1 - β * (a / a_t)]
+
+    This correction allows the grain size distribution to deviate from a
+    simple power law, providing better fits to observed interstellar
+    extinction curves.
+
+    References
+    ----------
+    Weingartner, J. C., & Draine, B. T. 2001, ApJ, 548, 296
+    "Dust Grain-Size Distributions and Extinction in the Milky Way,
+    Large Magellanic Cloud, and Small Magellanic Cloud"
+
+    See Also
+    --------
+    grain_size_distribution : Full grain size distribution using this correction
+
+    """
+    a = np.asarray(a, dtype=float)
+    f = np.ones_like(a)
+    if beta >= 0.0:
+        f += beta * a / a_t
+    else:
+        f /= 1.0 - beta * a / a_t
+    return f
+
+
+def mass_weighted_grain_size_dist(
+    radius: float, gsd_kwargs: dict | None = None, gm_kwargs: dict | None = None
+) -> float:
     """Calculate mass-weighted grain size distribution.
 
     Parameters
     ----------
     radius : float
         Grain radius in cm.
+    gsd_kwargs : dict or None, optional
+        Keyword arguments to pass to `grain_size_dist`. Default is None.
+    gm_kwargs : dict or None, optional
+        Keyword arguments to pass to `grain_mass`. Default is None.
 
     Returns
     -------
@@ -84,7 +333,7 @@ def mass_weighted_grain_size_dist(radius: float) -> float:
     the mass of a grain of size a.
 
     """
-    return grain_size_dist(radius) * grain_mass_cgs(radius)
+    return grain_size_dist(radius, **gsd_kwargs) * grain_mass(radius, **gm_kwargs)
 
 
 def normed_number_weighted_grain_dist(radius: NDArray[np.floating]) -> NDArray[np.floating]:
