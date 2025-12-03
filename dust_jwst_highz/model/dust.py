@@ -9,7 +9,10 @@ from scipy.special import erf
 from .cosmology import cosmo
 from .halo import virial_radius
 
+# TODO: offload to constants file
 ANGSTROM = 1e-8  # cm
+MEAN_MOL_WEIGHT = 1.22  # Mean molecular weight (typical ISM)
+DR_MW = 1.0 / 162.0  # Milky Way dust-to-gas ratio
 
 
 def small_carbonaceous_grain_dist(
@@ -96,6 +99,72 @@ def small_carbonaceous_grain_dist(
         dist[mask] = np.sum(bi[:, None] / a_pos[None, :] * gauss, axis=0)
 
     return dist
+
+
+def kappa_lambda(
+    radius: NDArray[np.floating],
+    q_abs_table: NDArray[np.floating],
+    dn_da_on_grid: NDArray[np.floating],
+    mu: float = MEAN_MOL_WEIGHT,
+    mh: float = apc.m_p.cgs.value,
+    dust_ratio: float = DR_MW,
+) -> NDArray[np.floating]:
+    """Compute mass absorption coefficient κ_λ from grain properties and size distribution.
+
+    Calculates the wavelength-dependent mass absorption coefficient by integrating
+    the product of grain cross sections, absorption efficiencies, and the grain
+    size distribution over all grain sizes.
+
+    Parameters
+    ----------
+    radius : ndarray of shape (Na,)
+        Grain radii in cm for this component (same grid as q_abs_table).
+    q_abs_table : ndarray of shape (Na, Nλ)
+        Absorption efficiency Q_abs(a_i, λ_j) at each grain size and wavelength.
+    dn_da_on_grid : ndarray of shape (Na,)
+        Grain size distribution (1/n_H) dn/da evaluated at radius grid points in cm^-1.
+        This is the number of grains per unit size per hydrogen atom.
+    mu : float, optional
+        Mean molecular weight of the gas (dimensionless). Default is 1.22 for typical ISM.
+    mh : float, optional
+        Proton mass in grams. Default is the CGS value from astropy.constants.
+    dust_ratio : float, optional
+        Dust-to-gas mass ratio (dimensionless). Default is 1/162 for Milky Way.
+
+    Returns
+    -------
+    ndarray of shape (Nλ,)
+        Mass absorption coefficient κ_λ in cm^2 g^-1 of dust.
+
+    Notes
+    -----
+    The mass absorption coefficient is computed as::
+
+        κ_λ = [∫ π a² Q_abs(a,λ) (dn/da) da] / (μ * m_H * D)
+
+    where the numerator is the integral over grain sizes of the absorption cross
+    section times the grain size distribution, and the denominator normalizes to
+    dust mass per unit volume.
+
+    """
+    # cell widths Δa (cm)
+    da = np.gradient(radius)
+
+    # numerator: sum_j ∫ π a^2 Q_abs(a,λ) (dn/da) da
+    # → vectorised over λ
+    # (Na, Nλ) * (Na,1) * (Na,1)
+    integrand = (
+        np.pi
+        * radius[:, None] ** 2
+        * q_abs_table  # (Na, Nλ)
+        * dn_da_on_grid[:, None]
+    )  # (Na,1)
+
+    num = np.sum(integrand * da[:, None], axis=0)  # (Nλ,)
+
+    denom = mu * mh * dust_ratio
+
+    return num / denom
 
 
 def mass_absorption_coefficient(
