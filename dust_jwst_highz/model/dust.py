@@ -1,18 +1,54 @@
+from functools import partial
 from typing import Callable
 
-import astropy.constants as apc
 import numpy as np
 from numpy.typing import NDArray
+from scipy import stats
 from scipy.integrate import quad
 from scipy.special import erf
 
+from .. import constants as const
 from .cosmology import cosmo
 from .halo import virial_radius
 
-# TODO: offload to constants file
-ANGSTROM = 1e-8  # cm
-MEAN_MOL_WEIGHT = 1.22  # Mean molecular weight (typical ISM)
-DR_MW = 1.0 / 162.0  # Milky Way dust-to-gas ratio
+
+def stellar_grain_size_dist(a_cm, a0_cm=1e-5, sigma=0.47):
+    """Lognormal stellar grain size distribution.
+
+    φ(a) such that
+
+        ∫ (4π/3) a^3 φ(a) da = 1  (mass-normalized).
+
+    Uses scipy.stats.lognorm for the underlying distribution.
+
+    Parameters
+    ----------
+    a_cm : array_like
+        Grain radius in cm.
+    a0_cm : float
+        Central grain radius in cm (default 0.1 μm = 1e-5 cm).
+    sigma : float
+        Lognormal width (standard deviation of log(a)).
+
+    Returns
+    -------
+    phi : ndarray
+        φ(a) with the same shape as a_cm.
+        Units: [1 / (cm^4)] so that (4π/3) ∫ a^3 φ(a) da is dimensionless.
+
+    """
+    a_cm = np.asarray(a_cm, dtype=float)
+
+    # scipy lognorm: PDF(x) = 1/(x*sigma*sqrt(2*pi)) * exp(-(ln(x) - ln(scale))^2 / (2*sigma^2))
+    # We set scale=a0_cm so the distribution is centered at a0_cm
+    lognorm_pdf = stats.lognorm.pdf(a_cm, s=sigma, scale=a0_cm)
+
+    # Normalize so that ∫ (4π/3) a^3 φ(a) da = 1
+    # The normalization constant accounts for the mass weighting
+    volume_factor = (4.0 / 3.0) * np.pi * a0_cm**3
+    correction_factor = np.exp(4.5 * sigma**2)  # from ∫ a^3 lognorm(a) da
+
+    return lognorm_pdf / (volume_factor * correction_factor)
 
 
 def small_carbonaceous_grain_dist(
@@ -75,8 +111,8 @@ def small_carbonaceous_grain_dist(
 
     a = np.asarray(radius, dtype=float)
     # log-normal centers in cm
-    a0_1 = 3.5 * ANGSTROM
-    a0_2 = 30.0 * ANGSTROM
+    a0_1 = 3.5 * const.angstrom
+    a0_2 = 30.0 * const.angstrom
     a0 = np.array([a0_1, a0_2])
 
     # split bc into two components
@@ -84,14 +120,14 @@ def small_carbonaceous_grain_dist(
 
     pref = 3.0 / ((2.0 * np.pi) ** 1.5)
 
-    x0 = a0 / (3.5 * ANGSTROM)
+    x0 = a0 / (3.5 * const.angstrom)
     arg = 3.0 * sigma / np.sqrt(2.0) + np.log(x0) / (sigma * np.sqrt(2.0))
     denom = 1.0 + erf(arg)
 
     bi = pref * np.exp(-4.5 * sigma**2) / (rho_graphite * a0**3 * sigma) * (bc_i * mc / denom)
 
     dist = np.zeros_like(a)
-    mask = a > 3.5 * ANGSTROM
+    mask = a > 3.5 * const.angstrom
     a_pos = a[mask]
     if a_pos.size > 0:
         a_ratio = np.log(a_pos[None, :] / a0[:, None]) / sigma
@@ -105,9 +141,9 @@ def kappa_lambda(
     radius: NDArray[np.floating],
     q_abs_table: NDArray[np.floating],
     dn_da_on_grid: NDArray[np.floating],
-    mu: float = MEAN_MOL_WEIGHT,
-    mh: float = apc.m_p.cgs.value,
-    dust_ratio: float = DR_MW,
+    mu: float = const.mean_mol_weight,
+    mh: float = const.m_p,
+    dust_ratio: float = const.dust_ratio_mw,
 ) -> NDArray[np.floating]:
     """Compute mass absorption coefficient κ_λ from grain properties and size distribution.
 
@@ -405,13 +441,15 @@ def mass_weighted_grain_size_dist(
     return grain_size_dist(radius, **gsd_kwargs) * grain_mass(radius, **gm_kwargs)
 
 
-def normed_number_weighted_grain_dist(radius: NDArray[np.floating]) -> NDArray[np.floating]:
+def normed_number_weighted_grain_dist(radius: NDArray[np.floating], **kwargs) -> NDArray[np.floating]:
     """Return normalized number-weighted grain distribution in bins of radius.
 
     Parameters
     ----------
     radius : ndarray
         Array of grain radius bin edges in cm. Must have at least 2 elements.
+    **kwargs : dict
+        Additional keyword arguments passed to `grain_size_dist`.
 
     Returns
     -------
@@ -427,17 +465,19 @@ def normed_number_weighted_grain_dist(radius: NDArray[np.floating]) -> NDArray[n
     """
     weights = np.zeros(len(radius) - 1)
     for s in range(1, len(radius)):
-        weights[s - 1] = quad(grain_size_dist, radius[s - 1], radius[s])[0]
+        weights[s - 1] = quad(partial(grain_size_dist, **kwargs), radius[s - 1], radius[s])[0]
     return weights / np.sum(weights)
 
 
-def normed_mass_weighted_grain_size_dist(radius: NDArray[np.floating]) -> NDArray[np.floating]:
+def normed_mass_weighted_grain_size_dist(radius: NDArray[np.floating], **kwargs) -> NDArray[np.floating]:
     """Return normalized mass-weighted grain distribution in bins of radius.
 
     Parameters
     ----------
     radius : ndarray
         Array of grain size bin edges in cm. Must have at least 2 elements.
+    **kwargs : dict
+        Additional keyword arguments passed to `grain_size_dist`.
 
     Returns
     -------
@@ -454,7 +494,7 @@ def normed_mass_weighted_grain_size_dist(radius: NDArray[np.floating]) -> NDArra
     """
     weights = np.zeros(len(radius) - 1)
     for s in range(1, len(radius)):
-        weights[s - 1] = quad(mass_weighted_grain_size_dist, radius[s - 1], radius[s])[0]
+        weights[s - 1] = quad(partial(mass_weighted_grain_size_dist, **kwargs), radius[s - 1], radius[s])[0]
     return weights / np.sum(weights)
 
 
@@ -617,9 +657,7 @@ def optical_depth(
     # Alternative: geometry_factor = 0.841 for slab geometry
     scale_length = disk_scale_length(z, halo_mass, spin)
 
-    return (
-        opacity * dust_mass / (geometry_factor * np.pi * scale_length**2) * apc.M_sun.cgs.value / apc.kpc.cgs.value**2
-    )
+    return opacity * dust_mass / (geometry_factor * np.pi * scale_length**2) * const.M_sun / const.kpc**2
 
 
 # --- Radiative Transfer: UV Transmission Functions ---

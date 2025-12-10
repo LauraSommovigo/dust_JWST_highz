@@ -1,9 +1,9 @@
 from typing import Literal
 
-import astropy.constants as apc
 import numpy as np
 from numpy.typing import NDArray
 
+from .. import constants as const
 from ..utils import chi
 from .cosmology import cosmo
 
@@ -348,12 +348,7 @@ def log_halo_mass_function(
     d_log_sigma = np.gradient(-np.log(rms_perturbation_amplitude(mh)), mh)
     d_log_mh = np.gradient(np.log(mh), mh)
     return (
-        np.log(10)
-        * f_sigma(mh, redshift)
-        * rho_m
-        / (mh * apc.M_sun.cgs)
-        * np.abs(d_log_sigma / d_log_mh)
-        * apc.Mpc.cgs**3
+        np.log(10) * f_sigma(mh, redshift) * rho_m / (mh * const.M_sun) * np.abs(d_log_sigma / d_log_mh) * const.Mpc**3
     )
 
 
@@ -407,8 +402,8 @@ def halo_mass_function(
         * rho_m
         / halo_mass**2
         * np.abs(d_log_sigma / d_log_mh)
-        * apc.Mpc.cgs**3
-        / apc.M_sun.cgs
+        * const.Mpc**3
+        / const.M_sun
     )
 
 

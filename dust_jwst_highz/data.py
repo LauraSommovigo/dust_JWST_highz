@@ -5,6 +5,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 DEFAULT_DATA_DIR = Path(__file__).parent.parent / "data"
+import pandas as pd
 
 
 @lru_cache(maxsize=8)
@@ -41,7 +42,7 @@ def hirashita19_attenuation_curve(
 
 @lru_cache(maxsize=8)
 def draine03_dust_model(
-    file_path: str | Path = DEFAULT_DATA_DIR / "Draine_MWDustRv31_Optical_prop.txt",
+    file_path: str | Path = DEFAULT_DATA_DIR / "Draine_MWDustRv31_Optical_prop.csv",
 ) -> interp1d:
     """Load Draine+2003 Milky Way dust model and return interpolation function for kUV.
 
@@ -64,12 +65,11 @@ def draine03_dust_model(
     gas-to-dust ratio to the adopted value.
 
     """
-    data = np.loadtxt(file_path)
+    data = pd.read_csv(file_path, comment="#")
 
-    wavelength_ang = data[:, 0] * 1e4  # Convert microns to Angstrom
-    albedo = data[:, 1]
-    kabs = data[:, 4]
-
+    wavelength_ang = data.iloc[:, 0] * 1e4  # Convert microns to Angstrom
+    albedo = data.iloc[:, 1]
+    kabs = data.iloc[:, 4]
     # Correct for scattering and gas-to-dust ratio
     kabs_corrected = (kabs * 90 / 163) / (1 - albedo)
 

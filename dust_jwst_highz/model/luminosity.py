@@ -1,8 +1,9 @@
 from typing import Literal
 
-import astropy.constants as apc
 import numpy as np
 from numpy.typing import NDArray
+
+from .. import constants as const
 
 
 def compute_l1500_steps_kss(sfh: NDArray[np.floating]) -> NDArray[np.floating]:
@@ -62,7 +63,7 @@ def l1500_lambda_to_lnu(l1500_ang: float | NDArray[np.floating]) -> float | NDAr
 
     """
     lambda_ang = 1500.0  # wavelength in Angstrom
-    return l1500_ang * lambda_ang**2 * 1e-8 / apc.c
+    return l1500_ang * lambda_ang**2 * const.angstrom / const.c
 
 
 def _compute_l1500_steps_ks98(sfh: NDArray[np.floating]) -> NDArray[np.floating]:
