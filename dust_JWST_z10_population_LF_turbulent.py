@@ -8,6 +8,7 @@ from scipy.stats import norm  # for inverse CDF of normal (lognormal quantiles)
 from scipy.signal import savgol_filter# for smoothing LF
 from scipy.ndimage import median_filter
 from matplotlib.lines import Line2D
+from scipy import special
 
 ##---- extra functions needed:
 def redistribute_phi(MUV_array, phi_array):
@@ -87,11 +88,11 @@ costum_colormap = truncate_colormap(costum_colormap, 0., 0.7)
 
 
 ### Choosing redshift, Mh range, dust model
-redshift=7.#7.#10.
+redshift=14.#7.#10.
 fb=cosmo.Ob(redshift)/cosmo.Om(redshift)
 lumDistpc = cosmo.luminosity_distance(redshift)*(1e6)#pc
 lumDistpc = lumDistpc.value
-logMh_array=np.linspace(6,13,30)##NB: important to use the same mass range used for the fitting in Yung+23
+logMh_array=np.linspace(8,13,70)##NB: important to use the same mass range used for the fitting in Yung+23
 
 ## Plot HMF
 plt.plot(logMh_array, dn_dlogMh_GUREFT(logMh_array,redshift),alpha=0.5,zorder=-10, label='Yung+23, GUREFT, z='+str(redshift))
@@ -145,389 +146,22 @@ kv=kv_drn
 #------------------------------------------------------------------------------------------
 ############# Loop in epsilon and yd: compute fract. of optically thick galaxies in the V-band
 #------------------------------------------------------------------------------------------
-arr_e=np.array([0.05, 0.1, 0.6])
-arr_yd=np.array([0.001, 0.3])
+arr_e=np.array([0.05, 0.10, 0.20])#[0.2])#0.05, 0.1, 0.6])
+arr_yd=np.array([0.02,0.3])#, 0.3])
 colors=np.array([costum_colormap(0), costum_colormap(0.5), costum_colormap(1.)])
 # if i only run one
 #colors=np.array([costum_colormap(0.5), costum_colormap(0.5), costum_colormap(0.5)])
 
-# ---------------- FAST: cache + compute f_obsc(Mh) with tau_V > 0.1 ----------------
-# Assumes: logMh_array, arr_e, arr_yd, fb, redshift, tstep, time_yr, time_yr_L1500, 
-#          L1500_SB99, logSNr_yr, halo_fredsto_stellar_mass, Build_SFH_funct, 
-#          compute_Mdust_steps, tau_pred, kv, kUV_drn, kUV_hir are already defined.
 
-# Spin distribution (fixed) reused everywhere
-len_sp_dis = 1000
-spin_param_distr = np.random.lognormal(mean=np.log(10**-1.5677), sigma=0.5390, size=len_sp_dis)
-''' Loop over epsilon and yd to compute fraction of obscured galaxies (tau_V > 0.1) 
-for epsilon in arr_e:
-    print('\n')
-    print('epsilon = ', epsilon)
 
-    # ---------- cache per-(epsilon, Mh): SFH/age + dust kernel Md_fin at yd=1 ----------
-    Mh_grid = 10**logMh_array
-    cached_age = [None]*len(logMh_array)
-    cached_SFH = [None]*len(logMh_array)
-    Md1_fin    = np.empty(len(logMh_array), dtype=float)   # final Md for yd=1 (kernel)
-    for j, Mh in enumerate(Mh_grid):
-        SFH, logMst_build, age = Build_SFH_funct(Mh, redshift, tstep, epsilon)
-        cached_SFH[j] = SFH
-        cached_age[j] = age
-        # run dust once with yd=1.0, then scale later
-        _, Md_arr_1 = compute_Mdust_steps(age, tstep, SFH, time_yr, logSNr_yr, yd=1.0)
-        Md1_fin[j] = Md_arr_1[-1]
-
-    # stellar mass only depends on epsilon (not on yd) -> compute once
-    Mstar_array = halo_to_stellar_mass(Mh_grid, fb, epsilon)
-    logMstar = np.log10(Mstar_array)
-
-    for yd in arr_yd:
-        print('yd = ', yd)
-
-        # scale dust kernel to the requested yield
-        Md_fin = yd * Md1_fin   # final Md at this yd for each mass bin
-
-        # per-Mh obscured fraction (tau_V > 0.1) using the spin ensemble
-        # NOTE: we DO NOT accumulate across masses; this is bin-by-bin.
-        f_obsc = np.empty(len(logMh_array), dtype=float)
-
-        for j, Mh in enumerate(Mh_grid):
-            tauV = tau_pred(kv, Md_fin[j], Mh, spin_param_distr, redshift)  # array over spins
-            f_obsc[j] = np.mean(tauV > 0.1)
-
-        # ------- SAVE -------
-        outpath_base = '/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/Low_Obscured_fract'
-        suffix = f"_1e3yd{int(1e3*yd)}_100eps{int(100*epsilon)}_z{int(redshift)}"
-        if kv == kUV_hir:
-            outfile = outpath_base + suffix + '_HiroDust.txt'
-        else:
-            outfile = outpath_base + suffix + '.txt'
-
-        header = (
-            f"yd={yd}, e_star={epsilon}\n"
-            "log(Mhalo/Msun)      log(Mstar/Msun)      n(tau_V>1e-1)/n per unit Mpc^-3"
-        )
-        np.savetxt(outfile, np.c_[logMh_array, logMstar, f_obsc], header=header)
-        print("Saved:", outfile)
-
-
-#### Plotting fraction of obscured galaxies as a function of epsilon_star and yd
-fig = plt.figure()
-ax1 = fig.add_subplot(111)
-for e in range(len(arr_e)):
-    epsilon=arr_e[e]
-    
-    for y in range(len(arr_yd)):
-        yd=arr_yd[y]
-        
-        if yd==0.1:
-            ls=':'
-        
-        if yd==0.001:
-            ls='-.'
-        
-        if yd==0.01:
-            ls='--'
-        
-        ## Loading data
-        # --- Read the correct obscured-fraction file depending on dust opacity model ---
-        base = "/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/Low_Obscured_fract"
-        suffix = f"_1e3yd{int(1e3*yd)}_100eps{int(100*epsilon)}_z{int(redshift)}"
-
-        if kUV == kUV_hir:
-            filename = base + suffix + "_HiroDust.txt"
-        elif kUV == kUV_drn:
-            filename = base + suffix + ".txt"
-        else:
-            raise ValueError("Unknown kUV model: must match kUV_hir or kUV_drn")
-
-        # --- Load columns ---
-        logMh_list, logMst_list, fobsc_list = np.loadtxt(filename, usecols=(0, 1, 2), unpack=True)
-
-
-        ## Plot obscured (tau_V>0.1) fraction as a function of Mstar
-        plt.plot(logMst_list, fobsc_list, label='$y_d/\mathrm{M_{\odot}}$ = '+str(yd), color=colors[e], ls=ls, lw=2., alpha=0.6)
-        #plt.scatter(logMst_list, fobsc_list, edgecolors=costum_colormap(epsilon), alpha=0.2, s=35, color='none')
-
-        #### Fraction of obscured (tau_V>0.1) galaxies per unit volume (multiplying previous number for HMF and integrating over Mh range)
-        #print( 'num of obscured galaxies per unit volume ->', np.trapz(dn_dlogMh_GUREFT(logMh_list,redshift)*fobsc_list,logMh_list), ' -- for eps=', epsilon, ', yd=', yd)
-        #print( 'num of gal. per unit volume ->', (cosmo.comoving_volume(redshift+0.01)-cosmo.comoving_volume(redshift-0.01))*np.trapz(dn_dlogMh_GUREFT(logMh_list,redshift),logMh_list))
-        print('ratio of obscured (tau_V>0.1) galaxies (%) -->', 100*np.trapz(dn_dlogMh_GUREFT(logMh_list,redshift)*fobsc_list,logMh_list) / np.trapz(dn_dlogMh_GUREFT(logMh_list,redshift),logMh_list))
-        print()
-        print()
-        
-        if e==0:
-            plt.legend(fontsize=12, loc='lower left')
-
-ax1.set_yscale('log')
-ax1.set_xlabel('$\log (M_{\star}/M_{\odot})$', fontsize=18)
-ax1.set_ylabel(' $n(\\tau_V>0.1) / n_{tot}$', fontsize=18)
-##
-ax1.plot(np.linspace(4, 12,10),0.5*np.ones(10),color='grey', alpha=0.2,lw=4.)
-ax1.text(10.4,0.49,'50\%', color='grey', fontsize=18,alpha=0.9,fontweight='bold')
-ax1.set_xlim(7,10.9)
-ax1.set_ylim(0.9e-2,1.05)
-#ax1.text(5.9, 0.0033, '$\epsilon_{\star}=$0.1', color=colors[1], fontsize=20, fontweight='bold')
-ax1.text(7.1, 0.023, '$\epsilon_{\star}=$0.05, ', color=colors[0], fontsize=20, fontweight='bold')
-ax1.text(7.67, 0.023, '   0.1,', color=colors[1], fontsize=20, fontweight='bold')
-ax1.text(7.9, 0.023, ' 0.5', color=colors[2], fontsize=20, fontweight='bold')
-
-plt.tight_layout()
-plt.show()
-
-
-
-
-
-
-
-#-------------------------------------------------------
-######### UV LF with SN dust correction (z=redshift)
-#-------------------------------------------------------
-
-# ---- knobs for the "in-between" behavior ----
-K_SPINS = 7        # small number of stratified spins per mass (5–9 works well)
-W_BLEND = 0.6      # 0=median, 1=mean; pick ~0.5–0.7 for "in-between"
-
-# ---- setup shared stuff ----
-dndlogM = dn_dlogMh_GUREFT(logMh_array, redshift)  # [Mpc^-3 dex^-1]
-mu_ln, sig_ln = np.log(10**-1.5677), 0.5390
-
-# fixed stratified quantiles in (0,1)
-u = (np.arange(1, K_SPINS+1) - 0.5) / K_SPINS
-z = norm.ppf(u)                          # standard-normal quantiles
-spin_quant = np.exp(mu_ln + sig_ln*z)    # lognormal quantiles for lambda, shape (K_SPINS,)
-
-fig, ax = plt.subplots(figsize=(9,7))
-
-for e, epsilon in enumerate(arr_e):
-    # cache intrinsic + dust kernel once per (epsilon, Mh)
-    Mh_grid    = 10**logMh_array
-    L1500_grid = np.empty_like(logMh_array, float)
-    Md1_grid   = np.empty_like(logMh_array, float)   # final Md at yd=1
-
-    for j, Mh in enumerate(Mh_grid):
-        SFH, logMst_build, age = Build_SFH_funct(Mh, redshift, tstep, epsilon)
-        L1500_grid[j] = compute_L1500_steps(age, tstep, SFH, time_yr_L1500, L1500_SB99)[-1]
-        Md1_grid[j]   = compute_Mdust_steps(age, tstep, SFH, time_yr, logSNr_yr, yd=1.0)[1][-1]
-
-    MUV_intr = L1500_to_MUV_conv(L1500_grid)
-
-    for yd in arr_yd:
-        ls = ':' if yd == arr_yd[1] else '-.' #if yd == arr_yd[0] else ('--' if yd == arr_yd[1] else '-'))
-
-        # scale dust kernel to this yd
-        Md_grid = yd * Md1_grid
-
-        # compute T for each stratified spin; blend mean/median => T_eff
-        # loop over Mh (cheap: K_SPINS is small)
-        T_eff = np.empty_like(Mh_grid, float)
-        for j, Mh in enumerate(Mh_grid):
-            # tau for K spins at this Mh
-            tauK = tau_pred(kUV, Md_grid[j], Mh, spin_quant, redshift)   # expects vector spins
-            TK   = T_1500_sphere_im(tauK)                                   # shape (K_SPINS,)
-
-            T_med  = np.median(TK)
-            T_mean = np.mean(TK)
-            T_eff[j] = (1.0 - W_BLEND)*T_med + W_BLEND*T_mean
-
-        # attenuated mags using the blended transmission
-        MUV_att = L1500_to_MUV_conv(T_eff * L1500_grid)
-
-        # ---- Jacobian -> LFs ----
-        dMUV_dlogM_att  = np.gradient(MUV_att,  logMh_array)
-        dMUV_dlogM_intr = np.gradient(MUV_intr, logMh_array)
-
-        # avoid zeros in derivative
-        eps_der = 1e-6
-        dMUV_dlogM_att  = np.where(np.abs(dMUV_dlogM_att)  < eps_der, np.sign(dMUV_dlogM_att)*eps_der,  dMUV_dlogM_att)
-        dMUV_dlogM_intr = np.where(np.abs(dMUV_dlogM_intr) < eps_der, np.sign(dMUV_dlogM_intr)*eps_der, dMUV_dlogM_intr)
-
-        phi_att  = dndlogM / np.abs(dMUV_dlogM_att)
-        phi_intr = dndlogM / np.abs(dMUV_dlogM_intr)
-
-        # ---- monotonicity check + redistribution (both curves) ----
-        def monotonic(x):
-            return np.all(np.diff(x) < 0) or np.all(np.diff(x) > 0)
-
-        if not monotonic(MUV_att):
-            MUV_att,  phi_att  = redistribute_phi(MUV_att,  phi_att)
-        if not monotonic(MUV_intr):
-            MUV_intr, phi_intr = redistribute_phi(MUV_intr, phi_intr)
-
-        # numpy safety
-        phi_att  = np.where(np.isfinite(phi_att)  & (phi_att > 0),  phi_att,  np.nan)
-        phi_intr = np.where(np.isfinite(phi_intr) & (phi_intr > 0), phi_intr, np.nan)
-        
-        ax.plot(MUV_att,  phi_att,  lw=3.0, ls=ls, color=colors[e])#,label=fr"ATT: $\epsilon$={epsilon}, $y_d$={yd}", alpha=0.9)#(K={K_SPINS}, w={W_BLEND})
-            
-    
-    ax.plot(MUV_intr, phi_intr, lw=4., color=colors[e], alpha=0.45)#label=fr"Intrinsic, $\epsilon$={epsilon}"
-    
-    # in line text for clarity, specifying SF efficiency
-    idx = int(0.63 * len(MUV_intr))
-    x_eps  = MUV_intr[idx]
-    y_eps  = 1.1*phi_intr[idx]
-    ax.text(x_eps, y_eps,fr'$\epsilon_\star={epsilon*100:.0f}\%$',fontsize=20, color=colors[e],
-            rotation=-30, rotation_mode='anchor', ha='left', va='bottom', alpha=0.6)
-
-
-# ---- Big free-floating labels + short horizontal line segments ----
-# y_d = 1e-3  (dash-dot)
-x0, y0 = 0.78, 0.88   # text anchor
-line_length = 0.10    # fraction of axes width
-ax.plot([x0 - line_length, x0 - 0.01], [y0, y0], transform=ax.transAxes, color='black', lw=3, ls='-.')
-ax.text(x0, y0, r'$y_d = 10^{-3}\,\mathrm{M_\odot}$',transform=ax.transAxes,fontsize=18, color='black',ha='left', va='center')
-# y_d = 0.3 (dashed)
-x1, y1 = 0.78, 0.82
-ax.plot([x1 - line_length, x1 - 0.01], [y1, y1],transform=ax.transAxes,color='black', lw=3, ls=':')
-ax.text(x1, y1,r'$y_d = 0.3\,\mathrm{M_\odot}$',transform=ax.transAxes,fontsize=18, color='black', ha='left', va='center')
-
-
-
-# Data & axes
-Plot_LF_Data(redshift, ax=ax)
-ax.set_yscale('log')
-ax.set_ylabel(r'$\phi(M_{UV})\ [\mathrm{Mpc}^{-3}\,\mathrm{mag}^{-1}]$')
-ax.set_xlabel(r'$M_{UV}$')
-if redshift==7:
-    ax.set_xlim(-18.4,-24.1)
-    ax.set_ylim(0.5e-7, 1e-1)
-else:
-    ax.set_xlim(-17.5,-23.5)   # more negative MUV = brighter; bright end on RIGHT
-    ax.set_ylim(0.5e-7, 1e-1)
-
-ax.legend(fontsize=12, ncols=2, loc='upper right')
-
-plt.subplots_adjust(left=0.12, bottom=0.087, right=0.983, top=0.958, wspace=0.2, hspace=0.2)
-
-plt.show()
-
-
-
-
-
-
-
-
-
-#-------------------------------------------------------
-######### IR LF (z=redshift)
-#-------------------------------------------------------
-
-# knobs for the in-between estimator (define only if missing)
-if 'K_SPINS' not in locals(): K_SPINS = 7    # 5–9 works nicely
-if 'W_BLEND' not in locals(): W_BLEND = 0.6  # 0=median, 1=mean
-if 'albedo'  not in locals(): albedo  = 0.3807
-
-# spin quantiles (deterministic stratified sampling) — define only if missing
-if 'spin_quant' not in locals():
-    from scipy.stats import norm
-    if 'mu_ln' not in locals() or 'sig_ln' not in locals():
-        mu_ln, sig_ln = np.log(10**-1.5677), 0.5390
-    u = (np.arange(1, K_SPINS+1) - 0.5) / K_SPINS
-    z = norm.ppf(u)
-    spin_quant = np.exp(mu_ln + sig_ln * z)  # shape (K_SPINS,)
-
-# HMF (use existing if available)
-dndlogM_IR = dndlogM if 'dndlogM' in locals() else dn_dlogMh_GUREFT(logMh_array, redshift)
-Mh_grid = 10**logMh_array
-nu_1500 = 3e10 / (1500e-8)  # Hz
-
-plt.figure(figsize=(9,7))
-
-for e, epsilon in enumerate(arr_e):
-    print('\n')
-    print('epsilon = ', epsilon)
-    
-    # cache per-Mh: L1500 and dust kernel at yd=1 to scale later
-    L1500_grid = np.empty_like(logMh_array, float)
-    Md1_grid   = np.empty_like(logMh_array, float)
-    for j, Mh in enumerate(Mh_grid):
-        SFH, logMst_build, age = Build_SFH_funct(Mh, redshift, tstep, epsilon)
-        L1500_grid[j] = compute_L1500_steps(age, tstep, SFH, time_yr_L1500, L1500_SB99)[-1]
-        Md1_grid[j]   = compute_Mdust_steps(age, tstep, SFH, time_yr, logSNr_yr, yd=1.0)[1][-1]
-
-    for yd in arr_yd:
-        ls = ':' if yd == arr_yd[1] else '-.' #if yd == arr_yd[0] else ('--' if yd == arr_yd[1] else '-'))
-
-        # scale dust kernel to this yd
-        Md_grid = yd * Md1_grid
-
-        # effective absorbed fraction via stratified spins + mean/median blend
-        A_eff = np.empty_like(Mh_grid, float)
-        for j, Mh in enumerate(Mh_grid):
-            Md_j = float(Md_grid[j])        # scalar
-            Mh_j = float(Mh)                # scalar
-            
-            # tau_ext (scatt + abs) for K spins at this Mh
-            tauK = np.array(
-                [tau_pred(kUV, Md_j, Mh_j, float(lam), redshift)
-                 for lam in spin_quant],
-                dtype=float
-            )  # shape (K_SPINS,)
-            
-            # tau_abs (abs only) for K spins at this Mh
-            tauK_abs = np.array(
-                [tau_pred(kUV_abs, Md_j, Mh_j, float(lam), redshift)
-                 for lam in spin_quant],
-                dtype=float
-            )  # shape (K_SPINS,)
-
-            TK   = T_1500_sphere_im(tauK)        # transmission given spin
-            AK   = 1.0 - T_1500_sphere_im(tauK_abs)                    # absorbed fraction given spin
-            A_eff[j] = (1.0 - W_BLEND) * np.median(AK) + W_BLEND * np.mean(AK)
-
-        # IR luminosity from absorbed UV 
-        LIR = A_eff * L1500_grid * nu_1500
-        logLIR = np.log10(LIR / Lsun)
-
-        # Jacobian: phi(LIR) = (dn/dlogMh) / |d logLIR / d logMh|
-        dlogLIR_dlogM = np.gradient(logLIR, logMh_array)
-        eps_der = 1e-6
-        dlogLIR_dlogM = np.where(np.abs(dlogLIR_dlogM) < eps_der,
-                                 np.sign(dlogLIR_dlogM)*eps_der, dlogLIR_dlogM)
-        phi_IR = dndlogM_IR / np.abs(dlogLIR_dlogM)
-
-        # monotonicity check + redistribution in logLIR space
-        mono = np.all(np.diff(logLIR) > 0) or np.all(np.diff(logLIR) < 0)
-        if not mono:
-            logLIR, phi_IR = redistribute_phi(logLIR, phi_IR)
-
-        plt.plot(logLIR, phi_IR, lw=3., ls=ls, color=colors[e])#,label=fr"$\epsilon$={epsilon}, $y_d$={yd}", alpha=0.9)
-
-# Barrufet+23 (REBELS) data at z=7 
-if redshift == 7:
-    logLIR_dat = np.array([11.45, 11.75, 12.05])
-    log_phi    = np.array([-4.4, -4.6, -5.1])
-    log_phi_uerr = np.array([0.2, 0.3, 0.2])
-    log_phi_lerr = np.array([0.2, 0.3, 0.5])
-    phi = 10**log_phi
-    phi_uerr = 10**(log_phi + log_phi_uerr) - phi
-    phi_lerr = phi - 10**(log_phi - log_phi_lerr)
-    plt.errorbar(logLIR_dat, phi, yerr=[phi_lerr, phi_uerr],
-                 ls='none', marker='s', ms=10, capsize=5, alpha=0.7,
-                 color='darkred', label='Barrufet+23, $z=7$',
-                 mew=1.5, mec='black', elinewidth=0.8)
-
-plt.yscale('log')
-plt.ylabel(r'$\phi(L_{\rm IR})\ [\mathrm{Mpc^{-3}\,dex^{-1}}]$')
-plt.xlabel(r'$\log (L_{\rm IR}/L_{\odot})$')
-plt.ylim(1.e-6, 1e-3)
-plt.xlim(10.4, 13.4)
-plt.legend(fontsize=12)
-plt.subplots_adjust(left=0.12, bottom=0.087, right=0.983, top=0.958, wspace=0.2, hspace=0.2)
-plt.show()
 
 '''
-
-
-
 # ============================================
 # Clumpy ISM LFs: UV (LOS percentiles) + IR (PDF-integrated)
 # Two-panel (UV, IR) only when redshift == 7; otherwise UV-only
 # Uses odd K_SPINS with an exact-median spin seed (u=0.5) and blends:
 #   T_eff = (1-W_BLEND)*T_med_seed + W_BLEND*mean(TK)
+# Montecarlo sampling nd shaded
 # ============================================
 
 # ---- knobs ----
@@ -814,4 +448,323 @@ else:
     plt.subplots_adjust(left=0.12, bottom=0.087, right=0.96, top=0.95)
 
 plt.show()
+'''
 
+
+
+
+# ============================================
+# Clumpy ISM LFs: UV + IR with Σ_d PDF and T_1500_sphere_im
+# Two-panel (UV, IR) only when redshift == 7; otherwise UV-only
+# NB: Lachlan Method
+# ============================================
+
+# ---- knobs ----
+K_SPINS  = 21      # used only to estimate geometry-induced Σ_d scatter
+Mach     = 30      # clumpy ISM width (lognormal σ for Σ_d from turbulence)
+albedo   = 0.3807
+K_U      = 24      # Gauss–Legendre nodes for Σ_d integral (IR)
+
+# ---- shared stuff ----
+Mh_grid   = 10**logMh_array
+dndlogM   = dn_dlogMh_GUREFT(logMh_array, redshift)  # [Mpc^-3 dex^-1]
+
+# spin distribution (for geometry scatter)
+mu_ln_spin, sig_ln_spin = np.log(10**-1.5677), 0.5390
+u_left  = (np.arange(1, (K_SPINS//2)+1) - 0.5) / K_SPINS
+u_mid   = np.array([0.5])
+u_right = 1.0 - u_left[::-1]
+u = np.concatenate([u_left, u_mid, u_right])          # length = K_SPINS
+z_spin = norm.ppf(u)
+spin_quant = np.exp(mu_ln_spin + sig_ln_spin*z_spin)  # (K_SPINS,)
+mid_idx = K_SPINS // 2
+
+# clumpy width from Mach (for Σ_d lognormal)
+def sigma_ln_from_Mach(Mach):
+    R = compute_R(Mach)  # Thompson+16 R(M) with alpha=2.5
+    return np.sqrt(np.log(1.0 + (R * Mach**2) / 4.0))
+sigma_turb = sigma_ln_from_Mach(Mach)
+
+# Gauss–Legendre nodes for Σ_d integral (in z-space)
+xu, wu  = np.polynomial.legendre.leggauss(K_U)
+u_nodes = np.clip(0.5*(xu+1.0), 1e-12, 1-1e-12)
+w_nodes = 0.5*wu
+z_nodes = norm.ppf(u_nodes)
+
+# --- invert T_1500_sphere_im: precompute τ(T) lookup once ---
+tau_max_lookup = 20.0
+N_tau          = 4000
+tau_grid = np.linspace(0.0, tau_max_lookup, N_tau)
+T_grid  = T_1500_sphere_im(tau_grid)          # T(τ) for UV
+
+# make T increasing for interpolation τ(T)
+T_rev   = T_grid[::-1]
+tau_rev = tau_grid[::-1]
+
+def tau_of_T(T_target):
+    """
+    Invert T_1500_sphere_im(τ) ≈ T_target by interpolation.
+    T_target in (0, 1]; vectorized.
+    """
+    T_target = np.asarray(T_target)
+    # clip into the range of precomputed T
+    T_clipped = np.clip(T_target, T_rev[0], T_rev[-1])
+    return np.interp(T_clipped, T_rev, tau_rev)
+
+# helpers
+def _nz(x):
+    return np.where(np.abs(x) < 1e-6, np.sign(x)*1e-6, x)
+
+def _lf_from_curve_sg(x_of_mh, window=9, poly=2):
+    # choose an odd window: 7/9/11 depending on len(logMh_array)
+    win = max(7, min(window, len(logMh_array) - (1 - len(logMh_array)%2)))
+    dx_dlogMh = savgol_filter(x_of_mh, win, poly, deriv=1,
+                              delta=np.mean(np.diff(logMh_array)), mode='interp')
+    dx_dlogMh = _nz(dx_dlogMh)
+    return dndlogM / np.abs(dx_dlogMh)
+
+def _ensure_mono(xc, phi):
+    mono = np.all(np.diff(xc) < 0) or np.all(np.diff(xc) > 0)
+    return (xc, phi) if mono else redistribute_phi(xc, phi)
+
+
+# ============================================
+# Figure setup: IR panel only if z=7
+# ============================================
+if redshift == 7:
+    gs = gridspec.GridSpec(1, 2, width_ratios=[1,1])
+    ax_uv = plt.subplot(gs[0])
+    ax_ir = plt.subplot(gs[1])
+    show_IR = True
+else:
+    fig, ax_uv = plt.subplots(figsize=(6.8,6.4))
+    ax_ir = None
+    show_IR = False
+
+for e, epsilon in enumerate(arr_e):
+    color = colors[e]
+    print('\n'); print('epsilon = ', epsilon)
+
+    # ---------- intrinsic L1500 and Md kernel per Mh (ε-dependent) ----------
+    L1500_grid = np.empty_like(logMh_array, float)
+    Md1_grid   = np.empty_like(logMh_array, float)   # Md at yd=1
+    for j, Mh in enumerate(Mh_grid):
+        SFH, logMst_build, age = Build_SFH_funct(Mh, redshift, tstep, epsilon)
+        L1500_grid[j] = compute_L1500_steps(
+            age, tstep, SFH, time_yr_L1500, L1500_SB99
+        )[-1]
+        Md1_grid[j]   = compute_Mdust_steps(
+            age, tstep, SFH, time_yr, logSNr_yr, yd=1.0
+        )[1][-1]
+
+    # Intrinsic UV LF (no dust):
+    MUV_intr_per_halo = L1500_to_MUV_conv(L1500_grid)   # per halo
+    MUV_intr          = MUV_intr_per_halo.copy()
+    phi_intr          = _lf_from_curve_sg(MUV_intr)
+    MUV_intr, phi_intr = _ensure_mono(MUV_intr, phi_intr)
+
+    # magnitude grid for analytic UV LF
+    Mbright   = MUV_intr.min() - 1.0   # slightly brighter
+    Mfaint    = MUV_intr.max() + 1.0   # slightly fainter
+    MUV_grid  = np.linspace(Mbright, Mfaint, 250)
+    nMh       = len(Mh_grid)
+    nM        = len(MUV_grid)
+
+    for yd in arr_yd:
+        ls = ':' if yd == arr_yd[1] else '-.' 
+
+        # scale dust kernel to this yd
+        Md_grid = yd * Md1_grid
+
+        # ---------- geometry-induced Σ_d from spins (per halo) ----------
+        tauK_grid   = np.empty((nMh, K_SPINS))
+        Sigma0      = np.empty(nMh)
+        sigma_geom  = np.empty(nMh)
+        for j, Mh in enumerate(Mh_grid):
+            tauK = tau_pred(kUV, Md_grid[j], Mh, spin_quant, redshift)  # (K_SPINS,)
+            tauK_grid[j, :] = tauK
+            SigmaK = tauK / kUV
+
+            # lognormal fit to Σ_d distribution from geometry
+            lnSigmaK = np.log(SigmaK)
+            Sigma0[j]     = np.exp(np.mean(lnSigmaK))      # geometric mean
+            sigma_geom[j] = np.std(lnSigmaK)               # ln-space scatter
+
+        # effective Σ_d scatter: geometry + turbulence (independent)
+        sigma_eff = np.sqrt(sigma_geom**2 + sigma_turb**2)
+
+        # ---------- uniform-screen UV LF (no clumpiness; median spin) ----------
+        tau_med = tauK_grid[:, mid_idx]       # median over spins
+        T_uniform = T_1500_sphere_im(tau_med)
+        MUV_uniform = L1500_to_MUV_conv(T_uniform * L1500_grid)
+        phi_uniform = _lf_from_curve_sg(MUV_uniform)
+        MUV_uniform, phi_uniform = _ensure_mono(MUV_uniform, phi_uniform)
+
+        # show uniform curve in faint dashed for reference
+        #ax_uv.plot(MUV_uniform, phi_uniform, lw=0.5, ls=ls,
+        #           color=color, alpha=0.4)
+
+        # ---------- CLUMPY UV: use lognormal Σ_d + T_1500_sphere_im ----------
+        # f_all[j, i] = fraction of galaxies at Mh_j brighter than MUV_grid[i]
+        f_all  = np.zeros((nMh, nM))
+        dfdM   = np.zeros_like(f_all)
+
+        for j in range(nMh):
+            M_int_j    = MUV_intr_per_halo[j]
+            Sigma0_j   = Sigma0[j]
+            sigma_j    = sigma_eff[j]
+
+            if not np.isfinite(Sigma0_j) or Sigma0_j <= 0.0 or sigma_j <= 0.0:
+                continue
+
+            # required transmission for each M: T_star = Lobs/Lint
+            T_star = 10**(-0.4 * (MUV_grid - M_int_j))   # can be >1 (unphysical)
+            # physically, T_star > 1 means "need brightening" → f = 0
+            valid_T = (T_star > 0.0) & (T_star <= 1.0)
+
+            tau_max = np.zeros_like(MUV_grid)
+            if np.any(valid_T):
+                tau_max[valid_T] = tau_of_T(T_star[valid_T])
+
+            Sigma_max = tau_max / kUV   # Σ_d,max(M, Mh_j)
+
+            # lognormal CDF: f = P(Σ_d < Σ_max)
+            f_Mj = np.zeros_like(MUV_grid)
+            positive = Sigma_max > 0.0
+            if np.any(positive):
+                z_ln = (np.log(Sigma_max[positive]) - np.log(Sigma0_j)) / (
+                    np.sqrt(2.0) * sigma_j
+                )
+                f_Mj[positive] = 0.5 * (1.0 + special.erf(z_ln))
+
+            f_all[j, :] = f_Mj
+
+            # derivative df/dM for this halo (central finite difference)
+            df = np.zeros_like(MUV_grid)
+            # central points
+            df[1:-1] = (f_Mj[2:] - f_Mj[:-2]) / (MUV_grid[2:] - MUV_grid[:-2])
+            # edges
+            df[0]  = (f_Mj[1] - f_Mj[0]) / (MUV_grid[1] - MUV_grid[0])
+            df[-1] = (f_Mj[-1] - f_Mj[-2]) / (MUV_grid[-1] - MUV_grid[-2])
+            dfdM[j, :] = df
+
+        # integrate over halo mass to get φ(M)
+        phi_clumpy = np.zeros_like(MUV_grid)
+        for i in range(nM):
+            integrand = dndlogM * dfdM[:, i]
+            phi_clumpy[i] = np.trapz(integrand, logMh_array)
+
+        # smooth φ(M) in log-space to reduce numerical wiggles
+        logphi = np.log10(np.clip(phi_clumpy, 1e-12, None))
+        win_M  = max(11, min(41, (len(MUV_grid)//3)*2 + 1))  # odd window
+        logphi_s = savgol_filter(logphi, win_M, 3, mode='interp')
+        phi_clumpy_s = 10**logphi_s
+
+        # enforce monotonic non-decreasing φ(M) as M increases (fainter → higher φ)
+        phi_mon = phi_clumpy_s.copy()
+        for i in range(1, len(phi_mon)):
+            if phi_mon[i] < phi_mon[i-1]:
+                phi_mon[i] = phi_mon[i-1]
+        phi_clumpy_s = phi_mon
+
+        # ---------- IR LF: same Σ_d lognormal + T_1500_sphere_im ----------
+        LIR_med = np.empty_like(logMh_array, float)
+        for j, Mh in enumerate(Mh_grid):
+            L1500 = L1500_grid[j]
+            mu_lnSigma = np.log(Sigma0[j])
+            sigma_j    = sigma_eff[j]
+
+            x_nodes = np.exp(mu_lnSigma + sigma_j * z_nodes)     # Σ_d quadrature nodes
+            T_abs_nodes = T_1500_sphere_im(kUV_abs * x_nodes)
+            A_nodes     = 1.0 - T_abs_nodes
+
+            f_abs = np.sum(w_nodes * A_nodes)   # average absorbed fraction
+            LIR_med[j]  = (L1500 * f_abs * (3e10/(1500e-8))) / Lsun
+
+        logLIR_med = np.log10(LIR_med)
+        phi_IR     = _lf_from_curve_sg(logLIR_med)
+        logLIR_med, phi_IR = _ensure_mono(logLIR_med, phi_IR)
+
+        # ---------- plotting ----------
+        # clumpy UV LF
+        ax_uv.plot(MUV_grid, phi_clumpy_s, lw=3., ls=ls, color=color)
+
+        # IR LF (only if z=7)
+        if show_IR:
+            ax_ir.plot(logLIR_med, phi_IR, lw=3., ls=ls, color=color, alpha=0.95)
+
+    # Intrinsic UV LF (no dust), once per ε
+    ax_uv.plot(MUV_intr, phi_intr, lw=4., color=color, alpha=0.50)
+
+    # in-line text for clarity, specifying SF efficiency
+    idx = int(0.5 * len(MUV_intr))#0.63 z=7, 0.53 z=14
+    x_eps  = MUV_intr[idx]
+    y_eps  = 1.3*phi_intr[idx]#1.3 for z=14
+    ax_uv.text(x_eps, y_eps, fr'$\epsilon_\star={epsilon*100:.0f}\%$',
+               fontsize=20, color=colors[e],
+               rotation=-50, rotation_mode='anchor',
+               ha='left', va='bottom', alpha=0.6)#-30 for z=7 drn, -50 z14
+
+
+# ---- Big free-floating labels + short horizontal line segments ----
+x0, y0 = 0.74, 0.815   # text anchor, 0.74, 0.915 for z=7, for z=14 0.74, 0.815
+line_length = 0.10
+ax_uv.plot([x0 - line_length, x0 - 0.01], [y0, y0],
+           transform=ax_uv.transAxes, color='black', lw=3, ls='-.')
+ax_uv.text(x0, y0, r'$y_d = 0.02\,\mathrm{M_\odot}$',
+           transform=ax_uv.transAxes, fontsize=18, color='black',
+           ha='left', va='center')
+x1, y1 = 0.74, 0.755 ## text anchor, 0.74, 0.865 for z=7, for z=14 0.74, 0.755
+ax_uv.plot([x1 - line_length, x1 - 0.01], [y1, y1],
+           transform=ax_uv.transAxes, color='black', lw=3, ls=':')
+ax_uv.text(x1, y1, r'$y_d = 0.3\,\mathrm{M_\odot}$',
+           transform=ax_uv.transAxes, fontsize=18, color='black',
+           ha='left', va='center')
+
+# --- cosmetics ---
+Plot_LF_Data(redshift, ax=ax_uv)
+ax_uv.set_yscale('log')
+ax_uv.set_ylabel(r'$\phi(M_{UV})\ [\mathrm{Mpc}^{-3}\,\mathrm{mag}^{-1}]$')
+ax_uv.set_xlabel(r'$M_{UV}$')
+
+if redshift == 7:
+    ax_uv.set_xlim(-19., -24.1)
+    ax_uv.set_ylim(0.5e-7, 1e-2)
+
+    #plot vertican lines marking REBELS range
+    ax_uv.axvspan(-23, -21., color='lightskyblue', alpha=0.1, edgecolor='none',zorder=-1000)
+    ax_uv.text(-21.6,0.8e-7,'REBELS', color='lightskyblue',alpha=0.35)
+
+else:
+    ax_uv.set_xlim(-18, -23.5)
+    ax_uv.set_ylim(0.5e-7, 1e-2)
+
+ax_uv.legend(fontsize=12, ncols=2, loc='upper right')
+
+if show_IR:
+    # REBELS z=7 points, table 1 Barrufet+23
+    logLIR_dat = np.array([11.45, 11.75, 12.05])
+    log_phi = np.array([-4.3, -4.6, -5.5])
+    #max err btween detection and non detection, cause hihgly uncertain
+    log_phi_uerr = np.array([0.2, 0.3, 0.4])
+    log_phi_lerr = np.array([0.2, 0.3, 0.5])
+    phi_data = 10**log_phi
+    phi_uerr = 10**(log_phi + log_phi_uerr) - phi_data
+    phi_lerr = phi_data - 10**(log_phi - log_phi_lerr)
+    ax_ir.errorbar(logLIR_dat, phi_data, yerr=[phi_lerr, phi_uerr], ls='none',
+                   marker='s', ms=10, capsize=5, alpha=0.7, color='darkred',
+                   label='REBELS\n Barrufet+23, $z=7$', mew=1.5, mec='black',
+                   elinewidth=0.8)
+
+    ax_ir.set_yscale('log')
+    ax_ir.set_ylabel(r'$\phi(\log_{10} L_{\mathrm{IR}})\ [\mathrm{Mpc}^{-3}\,\mathrm{dex}^{-1}]$')
+    ax_ir.set_xlabel(r'$\log_{10}(L_{\mathrm{IR}}/L_{\odot})$')
+    ax_ir.set_ylim(1.e-7, 1e-3)
+    ax_ir.set_xlim(10.4, 13.4)
+    ax_ir.legend(fontsize=12, ncols=2, loc='upper right')
+    plt.subplots_adjust(left=0.07, bottom=0.087, right=0.983, top=0.958,
+                        wspace=0.169, hspace=0.2)
+else:
+    plt.subplots_adjust(left=0.12, bottom=0.087, right=0.96, top=0.95)
+
+plt.show()

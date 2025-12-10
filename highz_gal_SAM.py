@@ -390,17 +390,40 @@ def tau_pred(klam, Md, Mh, spin, z):
 # --- UV Attenuation: T_1500
 # Slab geometry
 def int_W_l(t, x):
-    chi = 2.
-    return (1. - t)**(chi - 1) * np.cosh(x * t)
+    chi = 2.0
+    return (1.0 - t)**(chi - 1.0) * np.cosh(x * t)
 
 def W_l(x):
-    chi = 2.
-    return chi * quad(int_W_l, 0, 1, args=x)[0]
+    """
+    Vectorized W_l(x) using scipy.integrate.quad for each scalar x.
+    Works for scalars or numpy arrays.
+    """
+    chi = 2.0
+    x_arr = np.atleast_1d(x).astype(float)
 
-def T_1500_slab(tau_1500, mu):
-    """Transmission for slab geometry."""
-    om_1500 = 0.3807  # MW dust albedo
-    Tl = (1. / mu) * np.exp(-(1. - om_1500) * tau_1500 / (2. * mu)) * W_l((1. - om_1500) * tau_1500 / (2. * mu))
+    W_vals = np.empty_like(x_arr, dtype=float)
+    for i, xi in enumerate(x_arr):
+        # quad expects args as a *tuple*
+        W_vals[i] = chi * quad(int_W_l, 0.0, 1.0, args=(xi,))[0]
+
+    # return scalar if input was scalar
+    if np.isscalar(x):
+        return W_vals[0]
+    return W_vals
+
+def T_slab(tau_lambda, mu, omega_lambda):
+    """
+    Slab geometry with scattering (Henyey-Greenstein).
+    tau_lambda   : array-like, optical depth at each wavelength
+    mu           : float, cos(inclination)
+    omega_lambda : array-like, albedo at each wavelength
+    """
+    tau_lambda   = np.asarray(tau_lambda, dtype=float)
+    omega_lambda = np.asarray(omega_lambda, dtype=float)
+
+    x = (1.0 - omega_lambda) * tau_lambda / (2.0 * mu)
+    W = W_l(x)                     # now safely vectorized
+    Tl = (1.0 / mu) * np.exp(-x) * W
     return Tl
 
 # Sphere geometry, point source, Code1973
@@ -418,6 +441,7 @@ def T_1500_sphere(tau_1500):
 def T_1500_sphere_im(tau_1500):
     """Transmission for spherical geometry, with stars and dust mixed. This accounts for geometry only."""
     Tl = 3./(4.*tau_1500) * (1. - 1./(2*tau_1500**2) + (1./tau_1500 + 1./(2*tau_1500**2)) * np.exp(-2.*tau_1500))
+    #Tl=np.exp(-tau_1500)
     return Tl
 
 # --- Functional form for the Attenuation Curve (not used at this stage) ---
@@ -714,57 +738,65 @@ def Plot_LF_Data(z, ax):
     None
         The function adds data points and error bars to the provided axis but does not return any value.
     """
-    ##--- Bouwens+21, LF pre JWST, z<10
-    if z<10:
-        # Load digitized observational data (Bouwens+21, adapted from Bouwens+15)
-        obs_data = np.genfromtxt("/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/digitized_uv_luminosity_function.txt", names=True, dtype=None, encoding=None)
-        mask = obs_data['Redshift'] == z
-        M_UV = obs_data['MUV'][mask]
-        Phi = obs_data['Phi'][mask]
-        Err_Phi=obs_data['Err_Phi'][mask]
-        #print(log_phi)
-        ax.errorbar(M_UV, Phi, yerr=[Err_Phi,Err_Phi], alpha=0.7, markeredgecolor='black', color='grey', fmt='s', markersize=10, linestyle='none')
+    ##--- Bouwens+21, LF pre JWST, z<10 
+    if z < 10:
+        # Load digitized observational data
+        obs_data = np.genfromtxt(
+            "/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/Bouwens21_z2-9.txt",
+            names=True, dtype=None, encoding=None
+        )
 
-        # Mask for upper limits: error is NaN or larger than Phi
-        is_upper_limit = np.isnan(Err_Phi)
+        mask = obs_data['Redshift'] == z
+
+        # Helper to safely convert to float and replace non-numerics with NaN
+        def to_float(arr):
+            out = []
+            for x in arr:
+                try:
+                    out.append(float(x))
+                except:
+                    out.append(np.nan)
+            return np.array(out, dtype=float)
+
+        M_UV = to_float(obs_data['MUV'][mask])
+        Phi  = to_float(obs_data['Phi'][mask])
+        Err_Phi_low = to_float(obs_data['Err_Phi_low'][mask])
+        Err_Phi_up  = to_float(obs_data['Err_Phi_up'][mask])
+
+        # Identify upper limits: missing or huge upper error
+        is_upper_limit = np.isnan(Err_Phi_up) | (Err_Phi_up > Phi)
         is_detection = ~is_upper_limit
 
-        # Fix large errors: cap error to 99% of Phi
-        Err_Phi_fixed = Err_Phi.copy()
-        too_large = (Err_Phi > Phi) & is_detection
-        Err_Phi_fixed[too_large] = 0.99 * Phi[too_large]
+        # --- Detections: asymmetric errors ---
+        Err_Phi_low_det = Err_Phi_low[is_detection].copy()
+        Err_Phi_up_det  = Err_Phi_up[is_detection].copy()
 
-        # Plot detections with error bars
+        # Cap absurd errors
+        max_err = 0.99 * Phi[is_detection]
+        Err_Phi_low_det = np.minimum(Err_Phi_low_det, max_err)
+        Err_Phi_up_det  = np.minimum(Err_Phi_up_det, max_err)
+
         ax.errorbar(
             M_UV[is_detection],
             Phi[is_detection],
-            yerr=Err_Phi[is_detection],
-            fmt='s',
-            markersize=10,
-            capsize=4,
-            elinewidth=0.8,
-            color='grey',
-            alpha=0.7,
-            markeredgecolor='black',
+            yerr=[Err_Phi_low_det, Err_Phi_up_det],
+            fmt='s', markersize=10, capsize=4, elinewidth=0.8,
+            color='grey', alpha=0.7, markeredgecolor='black',
             linestyle='none',
             label='Obs, Bouwens+21, $z=$'+str(int(z))
         )
 
-        # Plot upper limits (downward triangle)
+        # --- Upper limits ---
         ax.errorbar(
             M_UV[is_upper_limit],
             Phi[is_upper_limit],
-            yerr=0.2*Phi[is_upper_limit],
+            yerr=0.2 * Phi[is_upper_limit],
             uplims=True,
-            capsize=4,
-            elinewidth=0.8,
-            fmt='s',
-            markersize=10,
-            color='grey',
-            markeredgecolor='black',
-            linestyle='none',
-            alpha=0.7)
-        
+            fmt='s', markersize=10, capsize=4, elinewidth=0.8,
+            color='grey', markeredgecolor='black',
+            linestyle='none', alpha=0.7
+        )
+
     
     if z==10:
         ###--- Harikane+23: spec-z, Tab. 7 in https://doi.org/10.3847/1538-4357/ad0b7e

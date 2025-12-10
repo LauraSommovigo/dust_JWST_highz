@@ -1,10 +1,13 @@
-from matplotlib import cm
+from xml.parsers.expat import model
+
 from scipy.integrate import quad
 
 col_f = cm.get_cmap("gray")
 from librerie import *
 
 fold_in = "../"
+
+from scipy.stats import gaussian_kde, norm
 
 from highz_gal_SAM import *
 
@@ -13,6 +16,7 @@ mu = 2.0  # mean molecular weight (not used anymore)
 bd = 2.03
 kUV = kUV_drn  # cm^2/g
 kUV_abs = kUV_drn_abs
+kV = kv_drn
 
 ##############################################
 ##########   DUST DISTRIBUTIONS    ###########
@@ -75,14 +79,14 @@ time_yr_L1500 = np.loadtxt("/Users/lsommovigo/Desktop/Scripts/txt_files/L1500_in
 
 # ======== HALO MODEL PARAMETERS ===========
 redshift = 7.0
-logMh = 11.0  # 0.9
+logMh = 11.6  # 10.86#0.9
 fb = cosmo.Ob(redshift) / cosmo.Om(redshift)
 epsilon = 0.1
 yd = 0.1
 
 # Stellar mass from halo mass
 Mstar_array = halo_to_stellar_mass(10**logMh, fb, epsilon)
-print("log Mstar/Msun -->", np.log10(Mstar_array))
+print("\n\n log Mstar/Msun -->", np.log10(Mstar_array))
 
 # Build SFH
 tstep = 1  # [Myr]
@@ -108,7 +112,12 @@ print("MUV (intrinsic) -->", MUV_intr)
 M_dust = Md_arr[-1]
 print("log Mdust/Msun -->", np.log10(M_dust))
 print("log Mstar/Msun -->", np.log10(Mstar_array))
-
+print("median logMstar(Msun) [REBELS] -->", np.median(logMstar_REB_npSFH))
+print("rdisk (kpc) -->", rd_kpc(redshift, 10**logMh, np.median(spin_param_distr)))
+print(
+    "Median log(Sigmad (Msun/kpc^2)) [unif] -->",
+    np.log10(M_dust / (np.pi * (rd_kpc(redshift, 10**logMh, np.median(spin_param_distr))) ** 2)),
+)
 # Median sigma_d for uniform distribution [g/cm^2]
 tauUV_arr = tau_pred(kUV, M_dust, 10**logMh, spin_param_distr, redshift)
 Sigmad_arr = tauUV_arr / kUV  # g/cm^2
@@ -143,79 +152,9 @@ pdf_y_10 = np.log(10) * x_vals * lognormal_pdf_x(x_vals, mu_ln_10, sigma_ln_10)
 # plt.plot(y_vals, pdf_y_10, label='PDF Mach=10 (correct in log10-space)', lw=2)
 
 
-# --- Plot Sigma_dust distribution
-plt.figure(figsize=(9, 6))
-plt.hist(
-    np.log10(Sigmad_distr_10),
-    bins=30,
-    alpha=0.6,
-    histtype="step",
-    color="mistyrose",
-    edgecolor="firebrick",
-    label="Turbulence-driven (Mach=10)",
-    ls="--",
-    lw=1.5,
-    density=True,
-)
-plt.hist(
-    np.log10(Sigmad_distr_300),
-    bins=30,
-    alpha=0.3,
-    histtype="step",
-    color="midnightblue",
-    edgecolor="midnightblue",
-    label="Turbulence-driven(Mach=300)",
-    ls="--",
-    lw=1.0,
-    density=True,
-)
-plt.hist(
-    np.log10(Sigmad_arr),
-    bins=30,
-    alpha=0.2,
-    lw=2.5,
-    histtype="stepfilled",
-    color="grey",
-    edgecolor="dimgrey",
-    label="Spin-driven",
-    density=True,
-)
-
-plt.axvline(np.log10(np.percentile(Sigmad_distr_10, 16)), color="firebrick", linestyle="--", lw=2.0, alpha=0.6)
-plt.axvline(np.log10(np.percentile(Sigmad_distr_10, 84)), color="firebrick", linestyle="--", lw=2.0, alpha=0.6)
-
-plt.axvline(np.log10(np.percentile(Sigmad_distr_300, 16)), color="midnightblue", linestyle="--", alpha=0.4)
-plt.axvline(np.log10(np.percentile(Sigmad_distr_300, 84)), color="midnightblue", linestyle="--", alpha=0.4)
-
-plt.axvline(np.log10(np.percentile(Sigmad_arr, 16)), color="dimgrey", lw=2.5, alpha=0.4)
-plt.axvline(np.log10(np.percentile(Sigmad_arr, 84)), color="dimgrey", lw=2.5, alpha=0.4)
-plt.xlabel(r"$\log_{10}(\Sigma_{d}/M_{\odot}\,\mathrm{kpc}^{-2})$")
-plt.ylabel("PDF")
-plt.legend(frameon=False, fontsize=14, loc="upper left")
-plt.xlim(-7, -1)
-plt.tight_layout()
-plt.show()
-
-
-"""
-#--- Plot width of log-normal dust surface density distribution vs Mach number
-Mach_arr = np.linspace(5, 1000, 1000)
-R = compute_R(Mach_arr)
-sigma_lnSigma_sq = np.log(1 + (R * Mach_arr**2) / 4)
-plt.plot(Mach_arr, np.sqrt(sigma_lnSigma_sq),color='grey',alpha=0.5)
-plt.xscale('log')
-plt.xlabel('Mach number')
-plt.ylabel(r'$\sigma_{\ln \Sigma_d}$')
-#plt.title('Width of log-normal dust surface density distribution')
-plt.grid(True, which='both', ls=':', alpha=0.3)
-plt.tight_layout()
-plt.show()
-"""
-
-
-# --- knobs to mirror the LF logic ---
-from scipy.stats import norm
-
+# -----------------------------
+# 1) Build MUV distributions for spin-only and for Mach=10,300
+# -----------------------------
 K_SPINS = 13  # odd, so we include the exact median seed (u=0.5)
 W_BLEND = 0.6  # blend between median-seed transmission and mean over seeds
 N_LOS = 600  # LOS draws per Mach (distributed across seeds)
@@ -235,179 +174,173 @@ def sigma_ln_from_Mach(Mach):
     return np.sqrt(np.log(1 + (R * Mach**2) / 4.0))
 
 
-# containers for the text summary you print
-LUV_med_vals, LUV_84_vals, LIR_seedavg_vals, LIR_singlemu_vals = [], [], [], []
+# --- Spin-driven (no turbulent scatter): use uniform shell with spin spread ---
+tauUV_arr = tau_pred(kUV, Md_arr[-1], 10**logMh, spin_param_distr, redshift)
+Sigmad_arr = tauUV_arr / kUV  # [g/cm^2]
 
-plt.figure(figsize=(9, 6))
+T_1500_uniform = T_1500_sphere_im(tauUV_arr)  # one value per halo/spin
+L1500_uniform = Lintr * T_1500_uniform
+MUV_spin = -2.5 * np.log10(L1500_uniform) + 51.60
 
-for i, Mach in enumerate(Mach_array):
-    # lognormal width for the clumpy scatter (same for all LOS at this Mach)
+
+# --- Helper to get MUV draws for a given Mach using the clumpy LOS logic ---
+def get_MUV_clumpy(Mach):
     sigma_ln = sigma_ln_from_Mach(Mach)
-
-    # -------- seeds from the *empirical* Σ_d distribution (mirrors population code) --------
-    # we take K_SPINS empirical quantiles of Sigmad_arr as the seed means μ_sigma
+    # seeds from empirical Σ_d distribution (same as before)
     mu_sigmas = np.quantile(Sigmad_arr, u_seeds)  # shape (K_SPINS,)
 
-    # -------- UV: build LOS distribution by scattering around each seed and stacking --------
-    # use common quantiles for LOS to reduce noise, like in the LF code
+    # LOS quantiles
     u_los = (np.arange(1, N_LOS + 1) - 0.5) / N_LOS
     z_los = norm.ppf(u_los)[None, :]  # (1, N_LOS)
-    # draw Σ_d samples per seed (broadcast), then flatten
+
+    # Σ_d LOS, then τ, then T, then LUV
     Sigmad_LOS = np.exp(np.log(mu_sigmas)[:, None] + sigma_ln * z_los)  # (K_SPINS, N_LOS)
     tauUV_LOS = kUV * Sigmad_LOS
     T_uv_LOS = T_1500_sphere_im(tauUV_LOS)
     LUV_LOS = Lintr * T_uv_LOS
     LUV_draws = LUV_LOS.ravel()
 
-    # violin on log10 but draw in linear axis:
-    parts = plt.violinplot(
-        np.log10(LUV_draws), positions=[Mach], widths=0.3 * Mach, showmeans=False, showmedians=False, showextrema=False
+    return -2.5 * np.log10(LUV_draws) + 51.60  # MUV_att draws
+
+
+# ------------------------------------
+# Build extra Mach MUV distributions
+# ------------------------------------
+MUV_clumpy_10 = get_MUV_clumpy(10)
+MUV_clumpy_30 = get_MUV_clumpy(30)
+MUV_clumpy_100 = get_MUV_clumpy(100)
+MUV_clumpy_300 = get_MUV_clumpy(300)
+
+# Mach values for the clumpy case
+mach_vals = np.array([10, 30, 100, 300])
+
+
+# Build colormap for Mach curves (shared by left & right panels)
+def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=10):
+    new_cmap = colors.LinearSegmentedColormap.from_list(
+        "trunc({n},{a:.2f},{b:.2f})".format(n=cmap.name, a=minval, b=maxval), cmap(np.linspace(minval, maxval, n))
     )
-    for pc in parts["bodies"]:
-        y = pc.get_paths()[0].vertices[:, 1]
-        pc.get_paths()[0].vertices[:, 1] = 10**y  # back to linear y
-        pc.set_facecolor("royalblue")
-        pc.set_edgecolor("darkblue")
-        pc.set_alpha(0.15)
-        pc.set_zorder(1)
+    return new_cmap
 
-    # reference stats from the LOS distribution (these are what the violin shows)
-    LUV_med = np.median(LUV_draws)
-    LUV_p84 = np.percentile(LUV_draws, 84)
-    LUV_med_vals.append(LUV_med)
-    LUV_84_vals.append(LUV_p84)
 
-    # -------- UV: overlay the *uniform blended* point built from the SEEDS (no scatter) --------
-    # transmission at each seed (no clumpy perturbation) and blend like in LF:
-    TK_seeds = T_1500_sphere_im(kUV * mu_sigmas)  # shape (K_SPINS,)
-    T_med_seed = TK_seeds[mid_idx]  # exact median seed
-    T_mean = TK_seeds.mean()
-    T_eff = (1.0 - W_BLEND) * T_med_seed + W_BLEND * T_mean
-    LUV_eff = Lintr * T_eff
+cmap = truncate_colormap(plt.cm.coolwarm_r, 0.0, 1.0)
+mach_norm = (np.log10(mach_vals) - np.log10(mach_vals.min())) / (np.log10(mach_vals.max()) - np.log10(mach_vals.min()))
+mach_colors = [cmap(v) for v in mach_norm]  # [color(M=10), color(30), color(100), color(300)]
 
-    # Plot the blended "uniform" point on top of the violin
-    plt.scatter(
-        Mach,
-        LUV_eff,
-        s=70,
-        marker="o",
-        facecolor="royalblue",
-        edgecolor="black",
-        linewidths=0.6,
-        alpha=0.9,
-        label=r"$L_{\rm UV}$ (seed-blend)" if i == 0 else None,
-    )
+# -----------------------------
+# 2) Two-panel figure: Σ_d PDFs (left) + MUV PDFs (right)
+# -----------------------------
+fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
-    # Optionally also show the LOS-median and 84th as open markers (comment out if cluttered)
-    plt.scatter(
-        Mach,
-        LUV_med,
-        s=55,
-        marker="o",
-        facecolor="none",
-        edgecolor="royalblue",
-        linewidths=1.2,
-        alpha=0.8,
-        label=r"$L_{\rm UV}$ (LOS median)" if i == 0 else None,
-    )
-    # plt.scatter(Mach, LUV_p84, s=50, marker='o',
-    #             facecolor='none', edgecolor='navy', linewidths=1.0, alpha=0.7,
-    #             label=r'$L_{\rm UV,84}$' if i==0 else None)
+# ---- LEFT PANEL: Σ_d PDFs in log10-space (KDEs) ----
 
-    # -------- IR: integrate against the continuous PDF around each SEED, average across seeds --------
-    # Gauss–Legendre in Normal quantile space (fast + mirrors population code)
-    K_U = 24
-    xu, wu = np.polynomial.legendre.leggauss(K_U)
-    u_nodes = np.clip(0.5 * (xu + 1.0), 1e-12, 1 - 1e-12)
-    w_nodes = 0.5 * wu
-    z_nodes = norm.ppf(u_nodes)
+# conversion factor: g/cm^2 -> Msun/kpc^2
+gcm2_to_Msun_kpc2 = (kpc_to_cm**2) / Msun
 
-    # nodes in Σ_d for each seed
-    x_nodes = np.exp(np.log(mu_sigmas)[:, None] + sigma_ln * z_nodes[None, :])  # (K_SPINS, K_U)
-    tau_abs_nodes = kUV * (1.0 - albedo) * x_nodes
-    T_abs_nodes = T_1500_sphere_im(tau_abs_nodes)
-    A_nodes = 1.0 - T_abs_nodes
-    A_mean_seed = np.sum(w_nodes[None, :] * A_nodes, axis=1)  # (K_SPINS,)
-    f_abs_seedavg = A_mean_seed.mean()
-    LIR_seedavg = Lintr * f_abs_seedavg
-    LIR_seedavg_vals.append(LIR_seedavg)
+# convert Σ_d samples to Msun/kpc^2 and take log10
+logSig_spin = np.log10(Sigmad_arr * gcm2_to_Msun_kpc2)
+logSig_10 = np.log10(Sigmad_distr_10 * gcm2_to_Msun_kpc2)
+logSig_300 = np.log10(Sigmad_distr_300 * gcm2_to_Msun_kpc2)
 
-    # For comparison: your original single-μ IR using μ = median(Sigmad_arr)
-    mu_ln_lin = np.log(np.median(Sigmad_arr))
-    x = np.logspace(np.log10(np.exp(mu_ln_lin - 6 * sigma_ln)), np.log10(np.exp(mu_ln_lin + 6 * sigma_ln)), 2000)
-    p_x = lognormal_pdf_x(x, mu_ln_lin, sigma_ln)
-    tau_abs = kUV * x * (1.0 - albedo)
-    T_abs = T_1500_sphere_im(tau_abs)
-    LIR_singlemu = Lintr * np.trapz((1.0 - T_abs) * p_x, x)
-    LIR_singlemu_vals.append(LIR_singlemu)
+logs_list = [logSig_spin, logSig_10, logSig_300]
 
-    # Plot IR points:
-    # seed-averaged (solid diamond) and single-μ (hollow diamond) for comparison
-    plt.scatter(
-        Mach,
-        LIR_seedavg,
-        facecolor="coral",
-        edgecolor="darkred",
-        alpha=0.95,
-        label=r"$L_{\rm IR}$ (seed-avg PDF)" if i == 0 else None,
-        marker="d",
-        s=80,
-        zorder=4,
-    )
-    plt.scatter(
-        Mach,
-        LIR_singlemu,
-        facecolor="none",
-        edgecolor="darkred",
-        alpha=0.85,
-        label=r"$L_{\rm IR}$ (single-$\mu$ PDF)" if i == 0 else None,
-        marker="d",
-        s=70,
-        zorder=4,
-    )
+# common x-grid in log10(Σ_d / Msun kpc^-2)
+x_Sig_min = min(l.min() for l in logs_list)
+x_Sig_max = max(l.max() for l in logs_list)
+x_Sig = np.linspace(x_Sig_min, x_Sig_max, 400)
 
-# --- Uniform case (unchanged) ---
-T_1500_uniform = T_1500_sphere_im(tauUV_arr)
-L1500_uniform = Lintr * T_1500_uniform
-L1500_abs_uniform = Lintr * (1 - T_1500_uniform) * (1 - albedo)
-LIR_uniform = L1500_abs_uniform
-L1500_uniform_med = np.median(L1500_uniform)
-LIR_uniform_med = np.median(LIR_uniform)
+# colors & labels (left panel); use Mach colormap for 10 and 300
+colors_Sigma = [
+    "dimgrey",  # uniform / spin-driven
+    mach_colors[0],  # M=10
+    mach_colors[-1],  # M=300
+]
+labels_Sigma = [
+    "Galaxy-to-Galaxy scatter\n (Size driven)",
+    "Single galaxy, LOS scatter\n (Turbulence-driven, $\\mathcal{M}=10$)",
+    "(Turbulence-driven, $\\mathcal{M}=300$)",
+]
 
-print(
-    f"Uniform case --> Luv={L1500_uniform_med:.2e}, Lir={LIR_uniform_med:.2e}, "
-    f"Lir/(Luv+Lir)={LIR_uniform_med / (LIR_uniform_med + L1500_uniform_med):.2f}"
-)
-print(
-    "Clumpy case (Mach=10) --> Luv_med=",
-    LUV_med_vals[1],
-    ", Lir_seedavg=",
-    LIR_seedavg_vals[1],
-    ", Lir/(Luv+Lir)=",
-    LIR_seedavg_vals[1] / (LUV_med_vals[1] + LIR_seedavg_vals[1]),
-)
-print(
-    "Clumpy case (Mach=300) --> Luv_med=",
-    LUV_med_vals[-1],
-    ", Lir_seedavg=",
-    LIR_seedavg_vals[-1],
-    ", Lir/(Luv+Lir)=",
-    LIR_seedavg_vals[-1] / (LUV_med_vals[-1] + LIR_seedavg_vals[-1]),
-)
+for i, (logs, col, lab) in enumerate(zip(logs_list, colors_Sigma, labels_Sigma)):
+    kde = gaussian_kde(logs)  # KDE in log-space
+    pdf = kde(x_Sig)
 
-# --- finalize plot ---
-plt.axhline(Lintr, color="black", label="$L_{\\rm intr}$", lw=2, alpha=0.5, zorder=2)
-plt.axhline(
-    L1500_uniform_med, color="royalblue", linestyle="--", label="$L_{\\rm UV}$ (uniform)", lw=2, alpha=0.5, zorder=2
-)
-plt.axhline(LIR_uniform_med, color="coral", linestyle="--", label="$L_{\\rm IR}$ (uniform)", lw=2, alpha=0.5, zorder=2)
+    if i == 0:
+        # Uniform: galaxy-to-galaxy scatter → thick solid line, no fill
+        axes[0].plot(x_Sig, pdf, color=col, lw=2.8, label=lab)
+        p16, p84 = np.percentile(logs, [16, 84])
+        axes[0].axvline(p16, color=col, linestyle="-", lw=2.0, alpha=0.7)
+        axes[0].axvline(p84, color=col, linestyle="-", lw=2.0, alpha=0.7)
+    else:
+        # Turbulence: LOS-to-LOS scatter → shaded + dashed 16–84% lines
+        axes[0].fill_between(x_Sig, 0 * x_Sig, pdf, color=col, alpha=0.1, label=lab, zorder=-1000 + i)
+        axes[0].plot(x_Sig, pdf, color=col, lw=2.8, alpha=0.2)
+        p16, p84 = np.percentile(logs, [16, 84])
+        axes[0].axvline(p16, color=col, linestyle="--", lw=1.8, alpha=0.7)
+        axes[0].axvline(p84, color=col, linestyle="--", lw=1.8, alpha=0.7)
 
-plt.xscale("log")
-plt.yscale("log")
-plt.xlabel("Mach number $\\mathcal{M}$")
-plt.ylabel("Luminosity [erg/s/Å]")
-plt.ylim(1e25, 5e29)
-plt.legend(frameon=False, fontsize=13, ncol=2)
+axes[0].set_xlabel(r"$\log_{10}\!\left(\Sigma_{d}/M_{\odot}\,\mathrm{kpc}^{-2}\right)$")
+axes[0].set_ylabel(r"PDF")
+axes[0].set_xlim(x_Sig_min, x_Sig_max)
+axes[0].set_ylim(0, 1.5)
+axes[0].legend(frameon=False, fontsize=14, loc="upper left")
+
+# ---- RIGHT PANEL: MUV_att PDFs (KDEs), same Mach colors ----
+
+# List including new Mach numbers
+MUV_list = [
+    MUV_spin,  # uniform, galaxy-to-galaxy
+    MUV_clumpy_10,  # LOS-to-LOS
+    MUV_clumpy_30,
+    MUV_clumpy_100,
+    MUV_clumpy_300,
+]
+
+# Colors & labels for right panel:
+#   - first: uniform
+#   - then: 10, 30, 100, 300 with colormap colors
+colors_MUV = ["dimgrey"] + mach_colors
+labels_MUV = [
+    "Galaxy-to-Galaxy scatter",
+    r"Single galaxy, LOS scatter" + "\n" + r"$\mathcal{M}=10$",
+    r"$\mathcal{M}=30$",
+    r"$\mathcal{M}=100$",
+    r"$\mathcal{M}=300$",
+]
+
+# Build x-grid for MUV PDFs
+all_MUV = np.concatenate(MUV_list)
+x_MUV_min, x_MUV_max = all_MUV.min(), all_MUV.max()
+x_MUV = np.linspace(x_MUV_min, x_MUV_max, 400)
+
+# add Muv itrinsic line
+axes[1].axvline(MUV_intr, color="black", linestyle=":", lw=2.0, label=r"Intrinsic")
+
+for i, (arr, col, lab) in enumerate(zip(MUV_list, colors_MUV, labels_MUV)):
+    kde = gaussian_kde(arr)
+    pdf = kde(x_MUV)
+
+    if i == 0:
+        # Uniform: galaxy-to-galaxy scatter (solid, no fill)
+        axes[1].plot(x_MUV, pdf, color=col, lw=2.8, label=lab)
+        p16, p84 = np.percentile(arr, [16, 84])
+        axes[1].axvline(p16, color=col, linestyle="-", lw=2.0, alpha=0.7)
+        axes[1].axvline(p84, color=col, linestyle="-", lw=2.0, alpha=0.7)
+    else:
+        # Turbulence: LOS-to-LOS scatter → *shaded only* + dashed percentiles
+        axes[1].fill_between(x_MUV, 0 * x_MUV, pdf, color=col, alpha=0.1, label=lab)
+        axes[1].plot(x_MUV, pdf, color=col, lw=2.8, alpha=0.2)
+        p16, p84 = np.percentile(arr, [16, 84])
+        axes[1].axvline(p16, color=col, linestyle="--", lw=1.8, alpha=0.7)
+        axes[1].axvline(p84, color=col, linestyle="--", lw=1.8, alpha=0.7)
+
+
+axes[1].set_xlabel(r"$M_{\rm UV}$")
+axes[1].set_ylabel(r"PDF")
+axes[1].set_ylim(0, 0.46)
+axes[1].set_xlim(-14.5, MUV_intr - 0.5)  # keeps brighter magnitudes on the left
+axes[1].legend(frameon=False, fontsize=14, loc="upper left")
+
 plt.tight_layout()
 plt.show()
 
@@ -456,7 +389,7 @@ def seedavg_LIR_from(kUV_here_abs, Mach_here, Sigmad_arr, Lintr, K_SPINS=13, K_U
     f_abs_seedavg = A_mean_seed.mean()
 
     # Convert absorbed L_1500 to IR as in your earlier code:
-    # L_IR ≈ L_1500,int * f_abs * (c / λ_1500)
+    # L_IR ≈ L_1500,int * f_abs * (nu_1500)
     LIR = Lintr * f_abs_seedavg * (3e10 / (1500e-8))  # erg/s
     return LIR
 
@@ -507,7 +440,7 @@ if "Fnu_funct" not in globals():
         Td = T_CMB_corr(Td, redshift)
 
         # luminosity distance in cm (luminosity_distance is in Mpc)
-        DL = cosmo.luminosity_distance(redshift).value * kpc_to_cm  # [cm]
+        DL = cosmo.luminosity_distance(redshift).value * Mpc_to_cm  # [cm]
 
         # conversion to μJy
         cost = 1e29 * lamda_cm**2 / c / (4.0 * np.pi * DL**2)  # μJy
@@ -544,10 +477,22 @@ def Td_from_LIR_Md(LIR_erg_s, Mdust_Msun, beta_d, kabs_158):
 
 
 # ---- Build and plot the 4 SEDs ----
-cases = [
-    ("Draine MW", kUV_drn, kIR_drn, "crimson"),
-    ("Hirashita large-grain", kUV_hir, kIR_hir, "teal"),
+# --- Dust models used in the SED comparison ---
+dust_models = [
+    {
+        "name": "MW (WD01)",
+        "color": "crimson",
+        "kUV_abs": kUV_drn_abs,  # κ_1500,abs for MW dust (extinction × (1-ω))
+        "kIR_158": kIR_drn,  # κ_158 for MW dust
+    },
+    {
+        "name": "Stellar dust (H19)",
+        "color": "teal",
+        "kUV_abs": kUV_hir_abs,  # κ_1500,abs for stellar dust
+        "kIR_158": kIR_hir,  # κ_158 for stellar dust
+    },
 ]
+
 
 Mach_list = [10, 300]
 linestyle_map = {10: "-", 300: "--"}
@@ -559,17 +504,23 @@ lam_cm_rest = lambda_rest * 1e-4  # cm (rest)
 
 plt.figure(figsize=(7.2, 5.2))
 
-for label_k, kappa_UV, kappa_IR_158, color in cases:
-    for Mnum in Mach_list:
-        # L_IR from clumpy ISM (uses κ_UV)
-        LIR_case = seedavg_LIR_from(kUV_abs, Mnum, Sigmad_arr, Lintr, albedo=albedo, K_SPINS=13, K_U=24)
+for model in dust_models:
+    label = model["name"]
+    color = model["color"]
+    kUV_abs_model = model["kUV_abs"]  # κ_1500,abs for this model
+    kappa_158_model = model["kIR_158"]  # κ_158 for this model
 
-        # Td from L_IR, Mdust, and κ_158
-        Td_case = Td_from_LIR_Md(LIR_case, M_dust, bd, kappa_IR_158)
-        print("\n", label_k, "Mach =", Mnum, "Td =", Td_case)
+    for Mnum in [10, 300]:
+        # L_IR from clumpy ISM with the *correct* UV opacity
+        LIR_case = seedavg_LIR_from(kUV_abs_model, Mnum, Sigmad_arr, Lintr, K_SPINS=13, K_U=24)
+        print("log (LIR/Lsun) for dust model", label, "Mach =", Mnum, "=", np.log10(LIR_case / Lsun))
 
-        # SED in μJy
-        Fnu_case = Fnu_funct(lam_cm_rest, Td_case, bd, np.log10(M_dust), redshift, kappa_IR_158)
+        # Td from L_IR, Mdust, and κ_158 of this model
+        Td_case = Td_from_LIR_Md(LIR_case, M_dust, bd, kappa_158_model)
+        print("\n", label, "Mach =", Mnum, "Td =", Td_case)
+
+        # SED in μJy using the same κ_158
+        Fnu_case = Fnu_funct(lam_cm_rest, Td_case, bd, np.log10(M_dust), redshift, kappa_158_model)
 
         plt.plot(
             np.log10(lambda_obs),
@@ -577,28 +528,60 @@ for label_k, kappa_UV, kappa_IR_158, color in cases:
             color=color,
             ls=linestyle_map[Mnum],
             lw=2.2,
-            label=f"{label_k}, Mach={Mnum} (T_d={Td_case:.1f} K)",
+            label=f"{label}, $\\mathcal{{M}}$={Mnum} ($T_d$={Td_case:.1f} K)",
+            alpha=0.7,
         )
 
+# --- REBELS data points overplotted ---
+## colormap (same as tau_v plot for consistency)
+custom_colormap_base = cm.coolwarm
+custom_colormap = truncate_colormap(custom_colormap_base, 0.1, 1.0)
 
-# --- ALMA band shading etc. (your original code) ---
-plt.fill_betweenx(
-    np.linspace(-5, 4.3, 100), np.log10(1.1e3), np.log10(1.4e3), color="gainsboro", alpha=0.2, zorder=-100
-)
-plt.text(np.log10(1.19e3), 1.2, "6", fontsize=12, alpha=0.65)
+# REBELS data
+if redshift == 7:
+    for jj in range(len(REBELS_index)):
+        plt.errorbar(
+            np.log10(158 * reds_REB[jj]),
+            np.log10(IR_Flux_meas[jj]),
+            yerr=[
+                [np.log10(IR_Flux_meas[jj] + err_IR_Flux_meas[jj]) - np.log10(IR_Flux_meas[jj])],
+                [-np.log10(IR_Flux_meas[jj] - err_IR_Flux_meas[jj]) + np.log10(IR_Flux_meas[jj])],
+            ],
+            ms=10.0,
+            marker="s",
+            capsize=2.5,
+            mec="black",
+            elinewidth=0.5,
+            alpha=0.8,
+            color=custom_colormap((logMstar_REB_npSFH[jj] - 6.2) / 4.2),
+            mew=0.3,
+        )
 
-plt.fill_betweenx(np.linspace(-5, 4.3, 100), np.log10(0.8e3), np.log10(1.1e3), color="silver", alpha=0.2, zorder=-100)
-plt.text(np.log10(0.9e3), 1.2, "7", fontsize=12, alpha=0.65)
+import matplotlib.pyplot as plt
+import numpy as np
 
-plt.fill_betweenx(np.linspace(-5, 4.3, 100), np.log10(0.6e3), np.log10(0.8e3), color="grey", alpha=0.2, zorder=-100)
-plt.text(np.log10(0.65e3), 1.2, "8", fontsize=12, alpha=0.65)
+cmap = plt.cm.magma  # choose your colormap here
+colors = cmap(np.linspace(0.2, 0.8, 4))  # 4 nice evenly spaced colors
+plt.text(2.7, 0.85, "ALMA Bands", fontsize=18, alpha=0.3)
+# y-range for the fills
+yr = np.linspace(-5, 4.3, 100)
+# Band 6
+plt.fill_betweenx(yr, np.log10(1.1e3), np.log10(1.4e3), color=colors[0], alpha=0.1, zorder=-100)
+plt.text(np.log10(1.19e3), 1, "6", fontsize=16, color=colors[0], alpha=0.5)
+# Band 7
+plt.fill_betweenx(yr, np.log10(0.8e3), np.log10(1.1e3), color=colors[1], alpha=0.1, zorder=-100)
+plt.text(np.log10(0.9e3), 1, "7", fontsize=16, color=colors[1], alpha=0.5)
+# Band 8
+plt.fill_betweenx(yr, np.log10(0.6e3), np.log10(0.8e3), color=colors[2], alpha=0.1, zorder=-100)
+plt.text(np.log10(0.65e3), 1, "8", fontsize=16, color=colors[2], alpha=0.5)
+# Band 9
+plt.fill_betweenx(yr, np.log10(0.4e3), np.log10(0.5e3), color=colors[3], alpha=0.1, zorder=-100)
+plt.text(np.log10(0.45e3), 1, "9", fontsize=16, color=colors[3], alpha=0.5)
 
-plt.fill_betweenx(np.linspace(-5, 4.3, 100), np.log10(0.4e3), np.log10(0.5e3), color="dimgrey", alpha=0.3, zorder=-100)
-plt.text(np.log10(0.47e3), 1.2, "9", fontsize=12, alpha=0.65)
-
-plt.ylim(-3.8, 1.7)
+plt.ylim(0.77, 2.45)
+plt.xlim(2.0, 3.35)
 plt.xlabel(r"$\log\,(\lambda_{\rm obs}/\mu{\rm m})$")
 plt.ylabel(r"$\log\,(F_{\nu}/{\rm \mu Jy})$")
-plt.legend(frameon=False, fontsize=11, ncol=1, loc="lower right")
+plt.legend(frameon=False, fontsize=11, ncol=1, loc="upper left")
 plt.tight_layout()
 plt.show()

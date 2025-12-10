@@ -87,11 +87,11 @@ costum_colormap = truncate_colormap(costum_colormap, 0., 0.7)
 
 
 ### Choosing redshift, Mh range, dust model
-redshift=7.#7.#10.
+redshift=10.#7.#10.
 fb=cosmo.Ob(redshift)/cosmo.Om(redshift)
 lumDistpc = cosmo.luminosity_distance(redshift)*(1e6)#pc
 lumDistpc = lumDistpc.value
-logMh_array=np.linspace(6,13,30)##NB: important to use the same mass range used for the fitting in Yung+23
+logMh_array=np.linspace(8,13,20)##NB: important to use the same mass range used for the fitting in Yung+23
 
 ## Plot HMF
 plt.plot(logMh_array, dn_dlogMh_GUREFT(logMh_array,redshift),alpha=0.5,zorder=-10, label='Yung+23, GUREFT, z='+str(redshift))
@@ -145,8 +145,8 @@ kv=kv_drn
 #------------------------------------------------------------------------------------------
 ############# Loop in epsilon and yd: compute fract. of optically thick galaxies in the V-band
 #------------------------------------------------------------------------------------------
-arr_e=np.array([0.05, 0.1, 0.6])
-arr_yd=np.array([0.001, 0.3])
+arr_e=np.array([0.05, 0.10, 0.20])#[0.2])#0.05, 0.1, 0.6])
+arr_yd=np.array([0.02,0.3])#, 0.3])
 colors=np.array([costum_colormap(0), costum_colormap(0.5), costum_colormap(1.)])
 # if i only run one
 #colors=np.array([costum_colormap(0.5), costum_colormap(0.5), costum_colormap(0.5)])
@@ -275,7 +275,7 @@ ax1.text(7.9, 0.023, ' 0.5', color=colors[2], fontsize=20, fontweight='bold')
 plt.tight_layout()
 plt.show()
 
-
+'''
 
 
 
@@ -365,21 +365,21 @@ for e, epsilon in enumerate(arr_e):
     ax.plot(MUV_intr, phi_intr, lw=4., color=colors[e], alpha=0.45)#label=fr"Intrinsic, $\epsilon$={epsilon}"
     
     # in line text for clarity, specifying SF efficiency
-    idx = int(0.63 * len(MUV_intr))
+    idx = int(0.58 * len(MUV_intr))
     x_eps  = MUV_intr[idx]
-    y_eps  = 1.1*phi_intr[idx]
+    y_eps  = 1.3*phi_intr[idx]
     ax.text(x_eps, y_eps,fr'$\epsilon_\star={epsilon*100:.0f}\%$',fontsize=20, color=colors[e],
-            rotation=-30, rotation_mode='anchor', ha='left', va='bottom', alpha=0.6)
+            rotation=-50, rotation_mode='anchor', ha='left', va='bottom', alpha=0.6)
 
 
 # ---- Big free-floating labels + short horizontal line segments ----
 # y_d = 1e-3  (dash-dot)
-x0, y0 = 0.78, 0.88   # text anchor
+x0, y0 = 0.74, 0.815   # text anchor
 line_length = 0.10    # fraction of axes width
 ax.plot([x0 - line_length, x0 - 0.01], [y0, y0], transform=ax.transAxes, color='black', lw=3, ls='-.')
-ax.text(x0, y0, r'$y_d = 10^{-3}\,\mathrm{M_\odot}$',transform=ax.transAxes,fontsize=18, color='black',ha='left', va='center')
+ax.text(x0, y0, r'$y_d = 0.02\,\mathrm{M_\odot}$',transform=ax.transAxes,fontsize=18, color='black',ha='left', va='center')
 # y_d = 0.3 (dashed)
-x1, y1 = 0.78, 0.82
+x1, y1 = 0.74, 0.755
 ax.plot([x1 - line_length, x1 - 0.01], [y1, y1],transform=ax.transAxes,color='black', lw=3, ls=':')
 ax.text(x1, y1,r'$y_d = 0.3\,\mathrm{M_\odot}$',transform=ax.transAxes,fontsize=18, color='black', ha='left', va='center')
 
@@ -391,11 +391,16 @@ ax.set_yscale('log')
 ax.set_ylabel(r'$\phi(M_{UV})\ [\mathrm{Mpc}^{-3}\,\mathrm{mag}^{-1}]$')
 ax.set_xlabel(r'$M_{UV}$')
 if redshift==7:
-    ax.set_xlim(-18.4,-24.1)
-    ax.set_ylim(0.5e-7, 1e-1)
+    #plot vertican lines marking REBELS range
+    ax.axvspan(-23, -21.,
+                color='lightskyblue', alpha=0.1,
+                edgecolor='none',zorder=-1000)
+    ax.text(-21.6,0.8e-7,'REBELS', color='lightskyblue',alpha=0.35)
+    ax.set_xlim(-19,-24.1)
+    ax.set_ylim(0.5e-7, 1e-2)
 else:
-    ax.set_xlim(-17.5,-23.5)   # more negative MUV = brighter; bright end on RIGHT
-    ax.set_ylim(0.5e-7, 1e-1)
+    ax.set_xlim(-18,-23.5)   # more negative MUV = brighter; bright end on RIGHT
+    ax.set_ylim(0.5e-7, 1e-2)
 
 ax.legend(fontsize=12, ncols=2, loc='upper right')
 
@@ -407,10 +412,7 @@ plt.show()
 
 
 
-
-
-
-
+'''
 #-------------------------------------------------------
 ######### IR LF (z=redshift)
 #-------------------------------------------------------
@@ -437,6 +439,7 @@ nu_1500 = 3e10 / (1500e-8)  # Hz
 plt.figure(figsize=(9,7))
 
 for e, epsilon in enumerate(arr_e):
+
     print('\n')
     print('epsilon = ', epsilon)
     
@@ -449,6 +452,8 @@ for e, epsilon in enumerate(arr_e):
         Md1_grid[j]   = compute_Mdust_steps(age, tstep, SFH, time_yr, logSNr_yr, yd=1.0)[1][-1]
 
     for yd in arr_yd:
+        
+        #ls='-.'
         ls = ':' if yd == arr_yd[1] else '-.' #if yd == arr_yd[0] else ('--' if yd == arr_yd[1] else '-'))
 
         # scale dust kernel to this yd
@@ -498,320 +503,30 @@ for e, epsilon in enumerate(arr_e):
 
 # Barrufet+23 (REBELS) data at z=7 
 if redshift == 7:
+    # REBELS z=7 points, table 1 Barrufet+23
     logLIR_dat = np.array([11.45, 11.75, 12.05])
-    log_phi    = np.array([-4.4, -4.6, -5.1])
-    log_phi_uerr = np.array([0.2, 0.3, 0.2])
+    log_phi = np.array([-4.3, -4.6, -5.5])
+    #max err btween detection and non detection, cause hihgly uncertain
+    log_phi_uerr = np.array([0.2, 0.3, 0.4])
     log_phi_lerr = np.array([0.2, 0.3, 0.5])
-    phi = 10**log_phi
-    phi_uerr = 10**(log_phi + log_phi_uerr) - phi
-    phi_lerr = phi - 10**(log_phi - log_phi_lerr)
-    plt.errorbar(logLIR_dat, phi, yerr=[phi_lerr, phi_uerr],
-                 ls='none', marker='s', ms=10, capsize=5, alpha=0.7,
-                 color='darkred', label='Barrufet+23, $z=7$',
-                 mew=1.5, mec='black', elinewidth=0.8)
+    phi_data = 10**log_phi
+    phi_uerr = 10**(log_phi + log_phi_uerr) - phi_data
+    phi_lerr = phi_data - 10**(log_phi - log_phi_lerr)
+    plt.errorbar(logLIR_dat, phi_data, yerr=[phi_lerr, phi_uerr], ls='none',
+                   marker='s', ms=10, capsize=5, alpha=0.7, color='darkred',
+                   label='REBELS\n Barrufet+23, $z=7$', mew=1.5, mec='black',
+                   elinewidth=0.8)
 
 plt.yscale('log')
 plt.ylabel(r'$\phi(L_{\rm IR})\ [\mathrm{Mpc^{-3}\,dex^{-1}}]$')
 plt.xlabel(r'$\log (L_{\rm IR}/L_{\odot})$')
-plt.ylim(1.e-6, 1e-3)
+plt.ylim(1.e-7, 1e-3)
 plt.xlim(10.4, 13.4)
 plt.legend(fontsize=12)
 plt.subplots_adjust(left=0.12, bottom=0.087, right=0.983, top=0.958, wspace=0.2, hspace=0.2)
 plt.show()
 
+
+
+
 '''
-
-
-
-# ============================================
-# Clumpy ISM LFs: UV (LOS percentiles) + IR (PDF-integrated)
-# Two-panel (UV, IR) only when redshift == 7; otherwise UV-only
-# Uses odd K_SPINS with an exact-median spin seed (u=0.5) and blends:
-#   T_eff = (1-W_BLEND)*T_med_seed + W_BLEND*mean(TK)
-# ============================================
-
-# ---- knobs ----
-K_SPINS  = 21     # odd; includes exact median spin seed (u=0.5). Try 13–21 for stability.
-W_BLEND  = 0.6      # 0=median (seed), 1=mean (over seeds)
-N_LOS    = 300      # LOS draws per seed for UV clumpy sampling
-Mach     = 30      # clumpy ISM width
-albedo   = 0.3807   # UV albedo
-K_U      = 24       # Gauss–Legendre nodes for IR integral
-SLOPE_FLOOR = 1e-3  # for spike masking (|dMUV/dlogMh| too small)
-
-# ---- shared stuff ----
-Mh_grid   = 10**logMh_array
-dndlogM   = dn_dlogMh_GUREFT(logMh_array, redshift)  # [Mpc^-3 dex^-1]
-mu_ln, sig_ln = np.log(10**-1.5677), 0.5390
-
-# spin quantile seeds — include exact median at u=0.5
-u_left  = (np.arange(1, (K_SPINS//2)+1) - 0.5) / K_SPINS
-u_mid   = np.array([0.5])
-u_right = 1.0 - u_left[::-1]
-u = np.concatenate([u_left, u_mid, u_right])          # length = K_SPINS
-z = norm.ppf(u)
-spin_quant = np.exp(mu_ln + sig_ln*z)                 # (K_SPINS,)
-mid_idx = K_SPINS // 2                                # index of exact-median seed
-
-# clumpy width from Mach (for Σ_d)
-def sigma_ln_from_Mach(Mach):
-    R = compute_R(Mach)  # Thompson+16 R(M) with alpha=2.5
-    return np.sqrt(np.log(1.0 + (R * Mach**2) / 4.0))
-sigma_ln = sigma_ln_from_Mach(Mach)
-
-# Gauss–Legendre nodes for IR integral (in u-space)
-xu, wu  = np.polynomial.legendre.leggauss(K_U)
-u_nodes = np.clip(0.5*(xu+1.0), 1e-12, 1-1e-12)
-w_nodes = 0.5*wu
-z_nodes = norm.ppf(u_nodes)
-
-# helpers
-def _nz(x):
-    return np.where(np.abs(x) < 1e-6, np.sign(x)*1e-6, x)
-
-def _lf_from_curve_sg(x_of_mh, window= 9, poly=2):
-    # choose an odd window: 7/9/11 depending on len(logMh_array)
-    win = max(7, min(window, len(logMh_array) - (1 - len(logMh_array)%2)))
-    dx_dlogMh = savgol_filter(x_of_mh, win, poly, deriv=1,
-                              delta=np.mean(np.diff(logMh_array)), mode='interp')
-    dx_dlogMh = _nz(dx_dlogMh)
-    return dndlogM / np.abs(dx_dlogMh)
-
-def _ensure_mono(xc, phi):
-    mono = np.all(np.diff(xc) < 0) or np.all(np.diff(xc) > 0)
-    return (xc, phi) if mono else redistribute_phi(xc, phi)
-
-def mask_by_slope(x_curve, phi_curve, slope_floor=SLOPE_FLOOR, hard_cap=10.0):
-    """
-    Remove/clip points where |d x / d logMh| is too small (spiky Jacobian).
-    Keeps arrays aligned by masking both x and phi at the same indices.
-    """
-    dx = np.abs(_nz(np.gradient(x_curve, logMh_array)))
-    bad = (dx < slope_floor) | ~np.isfinite(dx) | ~np.isfinite(phi_curve) | (phi_curve <= 0)
-    # optional hard cap on phi (log spikes)
-    phi_clip = np.minimum(phi_curve, hard_cap)
-    return x_curve[~bad], phi_clip[~bad]
-
-# ============================================
-# Figure setup: IR panel only if z=7
-# ============================================
-if redshift == 7:
-    gs = gridspec.GridSpec(1, 2, width_ratios=[1,1])
-    ax_uv = plt.subplot(gs[0])
-    ax_ir = plt.subplot(gs[1])
-    show_IR = True
-else:
-    fig, ax_uv = plt.subplots(figsize=(6.8,6.4))
-    ax_ir = None
-    show_IR = False
-
-_uniform_uv_plotted = False
-
-for e, epsilon in enumerate(arr_e):
-    color = colors[e]
-    print('\n'); print('epsilon = ', epsilon)
-
-    # ---------- intrinsic L1500 and Md kernel per Mh (ε-dependent) ----------
-    L1500_grid = np.empty_like(logMh_array, float)
-    Md1_grid   = np.empty_like(logMh_array, float)   # Md at yd=1
-    for j, Mh in enumerate(Mh_grid):
-        SFH, logMst_build, age = Build_SFH_funct(Mh, redshift, tstep, epsilon)
-        L1500_grid[j] = compute_L1500_steps(age, tstep, SFH, time_yr_L1500, L1500_SB99)[-1]
-        Md1_grid[j]   = compute_Mdust_steps(age, tstep, SFH, time_yr, logSNr_yr, yd=1.0)[1][-1]
-
-    # Intrinsic UV LF (no dust):
-    MUV_intr = L1500_to_MUV_conv(L1500_grid)
-    phi_intr = _lf_from_curve_sg(MUV_intr)
-    MUV_intr, phi_intr = _ensure_mono(MUV_intr, phi_intr)
-
-    for yd in arr_yd:
-        ls = ':' if yd == arr_yd[1] else '-.' #if yd == arr_yd[0] else ('--' if yd == arr_yd[1] else '-'))
-
-        # scale dust kernel to this yd
-        Md_grid = yd * Md1_grid
-
-        USE_PURE_MEDIAN = True   # set True to match estimators
-
-        T_eff = np.empty_like(Mh_grid, float)
-        for j, Mh in enumerate(Mh_grid):
-            tauK = tau_pred(kUV, Md_grid[j], Mh, spin_quant, redshift)  # τ for K seeds
-            TK   = T_1500_sphere_im(tauK)
-            if USE_PURE_MEDIAN:
-                T_eff[j] = TK[mid_idx]                      # exact median seed only
-            else:
-                T_med_seed = TK[mid_idx]
-                T_mean     = TK.mean()
-                T_eff[j]   = (1.0 - W_BLEND)*T_med_seed + W_BLEND*T_mean
-
-        MUV_uniform = L1500_to_MUV_conv(T_eff * L1500_grid)
-        phi_uniform = _lf_from_curve_sg(MUV_uniform)
-        MUV_uniform, phi_uniform = _ensure_mono(MUV_uniform, phi_uniform)
-
-        # Plot uniform baseline once (commented out by default to avoid clutter)
-        # if not _uniform_uv_plotted:
-        #     ax_uv.plot(MUV_uniform, phi_uniform, lw=1.3, ls='--', color='dimgray',
-        #                alpha=0.8, label='Uniform (median-seed blend)')
-        #     _uniform_uv_plotted = True
-
-        # ---------- CLUMPY UV: LOS sampling around the SAME seeds (Mach scatter) ----------
-        # common LOS quantiles reduce noise across Mh
-        u_LOS  = (np.arange(1, N_LOS+1) - 0.5) / N_LOS
-        z_LOS  = norm.ppf(u_LOS)[None, :]   # (1, N_LOS) -> broadcast to (K_SPINS, N_LOS)
-
-        MUV_p30 = np.empty_like(logMh_array, float)
-        MUV_p50 = np.empty_like(logMh_array, float)
-        MUV_p70 = np.empty_like(logMh_array, float)
-
-        # IR (isotropic) integrated over clumpy PDF
-        LIR_med = np.empty_like(logMh_array, float)
-
-        for j, Mh in enumerate(Mh_grid):
-            L1500 = L1500_grid[j]
-            Md    = Md_grid[j]
-
-            # Σ_d means from size/geometry seeds
-            tauK = tau_pred(kUV, Md, Mh, spin_quant, redshift)
-            mu_sigmas = tauK / kUV  # (K_SPINS,)
-
-            # --- UV LOS draws: K_SPINS seeds × N_LOS per seed, using common z_LOS ---
-            Sigmad_LOS = np.exp(np.log(mu_sigmas)[:, None] + sigma_ln * z_LOS)   # (K_SPINS, N_LOS)
-            #print('tauV LOS sample -->', np.min(kUV * Sigmad_LOS), '--', np.max(kUV * Sigmad_LOS))
-            T_uv       = T_1500_sphere_im(kUV * Sigmad_LOS)
-            LUV        = L1500 * T_uv
-            MUV_LOS    = L1500_to_MUV_conv(LUV.ravel())
-
-            MUV_p30[j] = np.percentile(MUV_LOS, 16)
-            MUV_p50[j] = np.percentile(MUV_LOS, 50)
-            MUV_p70[j] = np.percentile(MUV_LOS, 84)
-
-            # --- IR isotropic: integral over clumpy PDF around SAME seeds, then average seeds ---
-            x_nodes = np.exp(np.log(mu_sigmas)[:, None] + sigma_ln*z_nodes[None, :])     # (K_SPINS, K_U)
-            T_abs_nodes = T_1500_sphere_im(kUV_abs * x_nodes)
-            A_nodes     = 1.0 - T_abs_nodes
-            A_mean_seed = np.sum(w_nodes[None, :] * A_nodes, axis=1)  # (K_SPINS,)
-            f_abs       = np.mean(A_mean_seed)
-            LIR_med[j]  = (L1500 * f_abs * (3e10/(1500e-8))) / Lsun
-
-        # --- light smoothing BEFORE Jacobian ---
-        win = max(5, min(11, (len(logMh_array)//5)*2 + 1))  # odd window 7/9/11
-        MUV_p50 = savgol_filter(MUV_p50, win, 2, mode='interp')
-
-        # Only smooth p30/p70 when band is shown 
-        show_band = (
-            (np.isclose(yd, arr_yd[-1])  and np.isclose(epsilon, arr_e[1])) #or
-            #(np.isclose(yd, 0.1) and np.isclose(epsilon, 0.5))
-        )
-        if show_band:
-            MUV_p30 = savgol_filter(MUV_p30, win, 2, mode='interp')
-            MUV_p70 = savgol_filter(MUV_p70, win, 2, mode='interp')
-
-        # --- LFs from percentile curves (UV) ---
-        phi_30 = _lf_from_curve_sg(MUV_p30)
-        phi_50 = _lf_from_curve_sg(MUV_p50)
-        phi_70 = _lf_from_curve_sg(MUV_p70)
-
-        # avoid spikes due to near-zero slope in the discretized mapping
-        try:
-            MUV_p50, phi_50 = mask_by_slope(MUV_p50, phi_50, slope_floor=SLOPE_FLOOR, hard_cap=10.0)
-            MUV_p30, phi_30 = mask_by_slope(MUV_p30, phi_30, slope_floor=SLOPE_FLOOR, hard_cap=10.0)
-            MUV_p70, phi_70 = mask_by_slope(MUV_p70, phi_70, slope_floor=SLOPE_FLOOR, hard_cap=10.0)
-        except Exception:
-            # if mask_by_slope not defined in the environment, skip masking
-            pass
-
-        # enforce monotonicity after masking
-        MUV_p30, phi_30 = _ensure_mono(MUV_p30, phi_30)
-        MUV_p50, phi_50 = _ensure_mono(MUV_p50, phi_50)
-        MUV_p70, phi_70 = _ensure_mono(MUV_p70, phi_70)
-
-        # --- IR LF ---
-        logLIR_med = np.log10(LIR_med)
-        phi_IR     = _lf_from_curve_sg(logLIR_med)
-        logLIR_med, phi_IR = _ensure_mono(logLIR_med, phi_IR)
-
-        # --- UV plotting ---
-        ax_uv.plot(MUV_p50, phi_50, lw=3., ls=ls, color=color)#,label=fr"ATT (Mach {Mach}): $\epsilon$={epsilon}, $y_d$={yd}", alpha=0.95)
-
-        if show_band:
-            ax_uv.plot(MUV_p30, phi_30, lw=1.5, ls=ls, color=color, alpha=0.35)
-            ax_uv.plot(MUV_p70, phi_70, lw=1.5, ls=ls, color=color, alpha=0.35)
-            verts_uv = np.concatenate([
-                np.column_stack([MUV_p30,       phi_30]),
-                np.column_stack([MUV_p70[::-1], phi_70[::-1]])
-            ])
-            ax_uv.add_patch(Polygon(verts_uv, closed=True, facecolor=color, alpha=0.18, edgecolor='none'))
-
-        # --- IR plotting (only if z=7) ---
-        if show_IR:
-            ax_ir.plot(logLIR_med, phi_IR, lw=3., ls=ls, color=color, alpha=0.95)#,label=fr"$\epsilon$={epsilon}, $y_d$={yd}")
-
-    # Intrinsic UV LF (no dust), once per epsilon
-    ax_uv.plot(MUV_intr, phi_intr, lw=4., color=color, alpha=0.50)#,label=fr"Intrinsic, $\epsilon$={epsilon}")
-
-    # in line text for clarity, specifying SF efficiency
-    idx = int(0.63 * len(MUV_intr))
-    x_eps  = MUV_intr[idx]
-    y_eps  = 1.1*phi_intr[idx]
-    ax_uv.text(x_eps, y_eps,fr'$\epsilon_\star={epsilon*100:.0f}\%$',fontsize=20, color=colors[e],
-            rotation=-30, rotation_mode='anchor', ha='left', va='bottom', alpha=0.6)
-
-
-# ---- Big free-floating labels + short horizontal line segments ----
-# y_d = 1e-3  (dash-dot)
-x0, y0 = 0.74, 0.915   # text anchor
-line_length = 0.10    # fraction of axes width
-ax_uv.plot([x0 - line_length, x0 - 0.01], [y0, y0], transform=ax_uv.transAxes, color='black', lw=3, ls='-.')
-ax_uv.text(x0, y0, r'$y_d = 10^{-3}\,\mathrm{M_\odot}$',transform=ax_uv.transAxes,fontsize=18, color='black',ha='left', va='center')
-# y_d = 0.3 (dashed)
-x1, y1 = 0.74, 0.865
-ax_uv.plot([x1 - line_length, x1 - 0.01], [y1, y1],transform=ax_uv.transAxes,color='black', lw=3, ls=':')
-ax_uv.text(x1, y1,r'$y_d = 0.3\,\mathrm{M_\odot}$',transform=ax_uv.transAxes,fontsize=18, color='black', ha='left', va='center')
-
-
-
-
-# --- cosmetics ---
-Plot_LF_Data(redshift, ax=ax_uv)
-ax_uv.set_yscale('log')
-ax_uv.set_ylabel(r'$\phi(M_{UV})\ [\mathrm{Mpc}^{-3}\,\mathrm{mag}^{-1}]$')
-ax_uv.set_xlabel(r'$M_{UV}$')
-ax_uv.set_xlim(-17.5,-23.); 
-if redshift != 7:
-    ax_uv.set_ylim(0.5e-7, 1e-1)
-else:
-    ax_uv.set_ylim(0.5e-6, 1e-1)
-
-if redshift==7:
-    ax_uv.set_xlim(-18.4,-24.1)
-    ax_uv.set_ylim(0.5e-7, 1e-1)
-else:
-    ax_uv.set_xlim(-17.5,-23.)   # more negative MUV = brighter; bright end on RIGHT
-    ax_uv.set_ylim(0.5e-7, 1e-1)
-
-ax_uv.legend(fontsize=12, ncols=2, loc='upper right')
-
-if show_IR:
-    # REBELS z=7 points
-    logLIR = np.array([11.45, 11.75, 12.05])
-    log_phi = np.array([-4.4, -4.6, -5.1])
-    log_phi_uerr = np.array([0.2, 0.3, 0.2])
-    log_phi_lerr = np.array([0.2, 0.3, 0.5])
-    phi = 10**log_phi
-    phi_uerr = 10**(log_phi + log_phi_uerr) - phi
-    phi_lerr = phi - 10**(log_phi - log_phi_lerr)
-    ax_ir.errorbar(logLIR, phi, yerr=[phi_lerr, phi_uerr], ls='none',
-                   marker='s', ms=10, capsize=5, alpha=0.7, color='darkred',
-                   label='Barrufet+23, $z=7$', mew=1.5, mec='black', elinewidth=0.8)
-
-    ax_ir.set_yscale('log')
-    ax_ir.set_ylabel(r'$\phi(\log_{10} L_{\mathrm{IR}})\ [\mathrm{Mpc}^{-3}\,\mathrm{dex}^{-1}]$')
-    ax_ir.set_xlabel(r'$\log_{10}(L_{\mathrm{IR}}/L_{\odot})$')
-    ax_ir.set_ylim(1.e-6, 1e-3)
-    ax_ir.set_xlim(10.4, 13.4)
-    ax_ir.legend(fontsize=12, ncols=2, loc='upper right')
-    plt.subplots_adjust(left=0.07, bottom=0.087, right=0.983, top=0.958, wspace=0.169, hspace=0.2)
-else:
-    plt.subplots_adjust(left=0.12, bottom=0.087, right=0.96, top=0.95)
-
-plt.show()
-
