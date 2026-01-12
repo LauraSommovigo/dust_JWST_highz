@@ -8,7 +8,7 @@ from ..utils import chi
 from .cosmology import cosmo
 
 
-def growth_suppression(z, method: Literal["RP16", "GUREFT"] = "RP16"):
+def growth_suppression(z, method: Literal["RP16", "GUREFT"] = "GUREFT"):
     """Calculate growth suppression factor g(z) for structure formation.
 
     Parameters
@@ -19,7 +19,7 @@ def growth_suppression(z, method: Literal["RP16", "GUREFT"] = "RP16"):
         Method for computing growth suppression:
         - "RP16": Rodriguez-Puebla et al. (2016), equation 28
         - "GUREFT": Yung et al. (2023) formulation
-        Default is "RP16".
+        Default is "GUREFT".
 
     Returns
     -------
