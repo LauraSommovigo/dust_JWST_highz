@@ -653,7 +653,7 @@ plt.show()
 
 
 
-# --- figure ---
+# --- figure (not in the paper) ---
 fig, ax = plt.subplots(figsize=(10,6))
 # --- compute rd arrays ---
 rd_arr, rd_arr_low, rd_arr_up = [], [], []
