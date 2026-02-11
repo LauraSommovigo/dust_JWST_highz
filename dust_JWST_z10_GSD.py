@@ -1,10 +1,10 @@
 
+import os
 from astropy.table import pprint
 from scipy.integrate import quad
 from matplotlib import cm
 col_f = cm.get_cmap('gray')
 from librerie import *
-fold_in = '../'
 from highz_gal_SAM import *
 from general import name_and_save, increase_ticklabels, set_labels, do_minorticks, do_log, equal_axes, \
     set_colorbar_labels, set_ticklabels
@@ -13,10 +13,16 @@ from matplotlib.collections import PatchCollection
 import matplotlib.gridspec as gridspec
 from scipy.special import erf
 from matplotlib.ticker import LogFormatter
+from matplotlib.lines import Line2D
 
-##############################################
-##########    INPUT ARRAYS         ###########
-##############################################
+# ============================================================
+#  SECTION 1: Load Draine optical-property tables
+# ============================================================
+# Draine (2003) provides Q_abs, Q_sca, g(=<cos theta>) as a
+# function of grain radius a and wavelength lambda for three
+# compositions: PAH, graphite (carbonaceous), and silicate.
+# These tables are the foundation for computing dust opacities.
+# ============================================================
 
 
 def read_draine_table_PAH(filename):
@@ -169,7 +175,7 @@ def read_draine_table_carb_sil(filename):
             # Read until blank line or next radius
             while i < N and lines[i].strip() != "":
                 cols = lines[i].split()
-                if len(cols) >= 3:
+                if len(cols) >= 4:
                     wav_block.append(float(cols[0]))
                     Qabs_block.append(float(cols[1]))
                     Qsca_block.append(float(cols[2]))
@@ -207,27 +213,34 @@ def read_draine_table_carb_sil(filename):
 
 
 
-##--- Load Draine Q tables for carbon and silicate dust ---#
+# --- Load Draine Q tables for all three grain compositions ---
+# PAH tables have 5 columns (Qext, Qabs, Qsca, g);
+# graphite and silicate tables have 4 columns (Qabs, Qsca, g; no Qext).
 #- PAH
 radii_PAH, wavelength_PAH, Qext_PAH, Qabs_PAH, Qsca_PAH, g_PAH = read_draine_table_PAH(
-    "/Users/lsommovigo/Desktop/Scripts/txt_files/Dust_Draine/PAH_dust.txt"
+    os.path.join(SCRIPTS_DIR, "txt_files", "Dust_Draine", "PAH_dust.txt")
 )
 
 #- Carbonaceous grains
 radii_c, wavelength_c, Qabs_c, Qsca_c, g_c = read_draine_table_carb_sil(
-    "/Users/lsommovigo/Desktop/Scripts/txt_files/Dust_Draine/graphite_dust.txt"
-)   
+    os.path.join(SCRIPTS_DIR, "txt_files", "Dust_Draine", "graphite_dust.txt")
+)
 
 #- Silicate grains
 radii_s, wavelength_s, Qabs_s, Qsca_s, g_s = read_draine_table_carb_sil(
-    "/Users/lsommovigo/Desktop/Scripts/txt_files/Dust_Draine/silicate_dust.txt"
-)
+    os.path.join(SCRIPTS_DIR, "txt_files", "Dust_Draine", "silicate_dust.txt"
+))
 
 
 
 
-#-- NOW: show large grains are less UV absorbing than small grains 
-#-- (depending on grain size vs wavelength, specifically if a<<lambda or not)
+# ============================================================
+#  SECTION 2: Single-grain opacity kappa(lambda) for two sizes
+# ============================================================
+# Show that large grains are less UV-absorbing than small grains.
+# Two regimes: Rayleigh (a << lambda): kappa ~ 1/lambda
+#              Geometric (a >> lambda): kappa ~ 3/(4 rho a) = const
+# This motivates why the grain size distribution matters for UV opacity.
 
 
 # -----------------------------
@@ -248,7 +261,7 @@ def kappa_abs(a_micron, Qabs_arr, wavelength_um, rho):
 # 2. Choose two grain sizes
 # -----------------------------
 idx_small = 0          # smallest radius in table
-idx_big   = 11#-1         # radius ~ 0.3 micron, where Hirashita young dust centred
+idx_big   = 11            # radius ~ 0.3 micron, where Hirashita young dust is centred
 
 a_small_c = radii_c[idx_small]
 a_big_c   = radii_c[idx_big]
@@ -297,7 +310,7 @@ plt.loglog(wavelength_s, kappa_s_big,
            color="darkorange", ls="--",
            label=fr"Silicate, $a={a_big_s:.2e}\,\mu$m")
 
-# Mark transition from Rayleigh to geometric (a ~ lambda), a smalla nd big are the same for silicate and carbon
+# Mark transition from Rayleigh to geometric (a ~ lambda), a small and big are the same for silicate and carbon
 #plt.axvline(a_small_c, color="grey",  alpha=0.5,lw=3, ls='-')
 #plt.text(a_small_c*1.1, 10, r'$\lambda=a_{\rm small}$', rotation=90, color='grey', alpha=0.7, fontsize=12)
 plt.axvline(a_big_c,   color="grey", alpha=0.6,lw=1.5, ls='--')
@@ -317,7 +330,7 @@ plt.hlines(k_geo_b, 1e-4, 1e3,  lw=3, label=r'geom (big)', color='dimgrey', ls='
 plt.axvline(0.1500, lw=6, color='indigo', alpha=0.1)
 
 
-# Check power law behabiour in the FIR
+# Check power law behaviour in the FIR
 lam_fir = np.linspace(20, 1000, 100)
 
 plt.loglog(lam_fir, 12.85127581*(lam_fir/158.)**(-2), color='r', ls=':', lw=2, label=r'$\lambda^{-2}$ in FIR')
@@ -337,9 +350,16 @@ plt.show()
 
 
 
-# -------------------------------------------------------------------
-#----- Towards implementing WD01 GSD functions -----#
-# -------------------------------------------------------------------
+# ============================================================
+#  SECTION 3: Weingartner & Draine (2001) grain size distribution
+# ============================================================
+# WD01 parametrise the MW grain size distribution (GSD) as the
+# sum of two populations:
+#   - Very small carbonaceous grains: D(a), two lognormals (eqs. 2-3)
+#   - Larger grains (carbon + silicate): power law with exponential
+#     cutoff and curvature term F(a) (eqs. 4-6)
+# The GSD is expressed per H atom: (1/n_H) dn/da  [cm^-1]
+# ============================================================
 ANGSTROM = 1e-8  # cm
 
 #-- Very small grain D(a) function, WD01 eqs. (2)-(3) --#
@@ -442,7 +462,9 @@ def dn_da_silicate_WD01(a,
 
 
 
-# choose MW model: R_V = 3.1 (normal), case A, b_C = 2.0 entry
+# --- WD01 parameters for the standard MW diffuse ISM ---
+# R_V = 3.1, case A, b_C = 2.0e-5 (carbon abundance in very small grains)
+# WD01_MW_PARAMS is defined in highz_gal_SAM.py
 p = WD01_MW_PARAMS[3.1]["A"][2]
 
 # convert micron -> cm
@@ -487,9 +509,42 @@ plt.show()
 
 
 
-# -------------------------------------------------------------------
-#--- ok let's now compute opacity per unit dust mass
-# -------------------------------------------------------------------
+# ============================================================
+#  SECTION 4: Compute kappa_lambda integrated over WD01 GSD
+# ============================================================
+# kappa_lambda = (1/Sigma_d) * integral[ pi a^2 Q(a,lambda) dn/da da ]
+# where Sigma_d = mu * m_H * D (dust surface density per H column).
+# We compute absorption AND scattering opacities separately, then
+# combine carbon + silicate with mass fractions 1/11 and 10/11.
+# ============================================================
+
+def compute_g_lambda(wavelength_um, radii_um, Qsca_table, g_sca_table, dn_da):
+    """
+    Compute scattering asymmetry parameter g_lambda averaged over size distribution.
+
+    wavelength_um : (Nλ,)
+    radii_um      : (Na,)
+    Qsca_table    : (Na, Nλ)   scattering efficiency Q_sca(a, λ)
+    g_sca_table   : (Na, Nλ)   <cos θ> for each (a, λ)
+    dn_da         : (Na,)      size distribution (any normalization; cancels out)
+
+    Returns
+    -------
+    g_lambda : (Nλ,)   scattering asymmetry parameter at each λ.
+    """
+    a_cm = radii_um * 1e-4
+    da   = np.gradient(a_cm)
+
+    # weight ∝ π a^2 Q_sca dn/da
+    weight = np.pi * a_cm[:, None]**2 * Qsca_table * dn_da[:, None]  # (Na, Nλ)
+
+    num   = np.sum(weight * g_sca_table * da[:, None], axis=0)
+    denom = np.sum(weight * da[:, None],                axis=0)
+
+    g_lambda = num / denom
+    return g_lambda
+
+
 
 def compute_kappa_lambda(wavelength_um,
                           radii_um,
@@ -499,7 +554,15 @@ def compute_kappa_lambda(wavelength_um,
                           mH=mp,
                           D=D_MW):
     """
-    Compute κ_λ [cm^2/g_dust] from Q_abs(λ,a) and (1/n_H) dn/da(a).
+    Compute κ_λ [cm^2 / g_dust] from Q(a,λ) and (1/n_H) dn/da.
+
+    Numerator gives extinction/absorption cross-section per H:
+        σ_H(λ) = ∫ π a^2 Q(a,λ) (1/n_H) dn/da da
+
+    Denominator converts per-H to per-dust-mass using:
+        m_dust per H = μ m_p D
+
+    κ_λ = σ_H(λ) / (μ m_p D)
 
     Parameters
     ----------
@@ -561,6 +624,7 @@ kappa_s_abs = compute_kappa_lambda(wavelength_s, radii_s, Qabs_s, dn_da_Si)
 kappa_s_sca = compute_kappa_lambda(wavelength_s, radii_s, Qsca_s, dn_da_Si)
 
 # ---- Total MW mixture (C+Si) ----
+# Mass fractions: f_C = 1/11, f_Si = 10/11 (Draine 2003, Table 2)
 kappa_abs_tot = (1./11.) * kappa_c_abs + (10./11.) * kappa_s_abs
 kappa_sca_tot = (1./11.) * kappa_c_sca + (10./11.) * kappa_s_sca
 
@@ -592,8 +656,14 @@ plt.show()
 
 
 
-#------ Ok now we add the case of the readily produced from stars dust (Hirashita=19) GSD -----#
-#--- lognormal GSD centred at 0.3 micron with sigma=0.1
+# ============================================================
+#  SECTION 5: Stellar (young) dust — lognormal GSD (Hirashita+19)
+# ============================================================
+# Dust freshly produced by SNe and AGB stars has a lognormal GSD
+# peaked at larger grains (a0 ~ 0.1 um) than the MW GSD, because
+# interstellar shattering has not yet shifted mass to small grains.
+# Reference: Hirashita et al. (2019), eqs. 4-5.
+# ============================================================
 
 
 def C_phi_lognormal(a0_cm=1e-5, sigma=0.47):
@@ -653,7 +723,9 @@ mass_int = (4*np.pi/3) * np.trapz(a_grid_cm**3 * phi, a_grid_cm)
 phi_C_star  = phi_stellar(a_c_cm, a0_cm=1e-5, sigma=0.47)  # a0 = 0.1 μm
 phi_Si_star = phi_stellar(a_s_cm, a0_cm=1e-5, sigma=0.47)
 
-# convert φ(a) → (1/n_H) dn/da with the same D as MW
+# Convert mass-normalised phi(a) to (1/n_H) dn/da [cm^-1]
+# using the same dust-to-gas ratio D as MW, so differences
+# in kappa come purely from the GSD shape, not the total dust mass.
 factor_C  = mu_gas * mp * D_MW / ((4.0*np.pi/3.0) * rho_carb)
 factor_Si = mu_gas * mp * D_MW / ((4.0*np.pi/3.0) * rho_sil)
 
@@ -684,7 +756,9 @@ plt.tight_layout()
 plt.show()
 
 
-#--- Finally, compute κ_λ from stellar lognormal φ(a) -----#
+# --- Compute kappa_lambda from stellar lognormal phi(a) ---
+# kappa_from_phi is a simpler version of compute_kappa_lambda
+# that works directly with the mass-normalised phi(a).
 def kappa_from_phi(wavelength_um, radii_um, Qabs_table, phi_a, rho_gr):
     """
     κ_λ from mass-normalized φ(a).
@@ -711,20 +785,38 @@ dn_da_Si_star = factor_Si * phi_Si_star
 # ------------------------------------------------------------------
 # 2. κ_abs and κ_sca for stellar dust
 # ------------------------------------------------------------------
+
+# ============================================================
+#  SECTION 6: Stellar dust mixture — total kappa, albedo, g
+# ============================================================
+# Combine carbonaceous and silicate stellar opacities with the
+# same mass fractions as MW (fC=1/11, fSi=10/11) to isolate
+# the effect of the GSD shape change on the overall opacity.
+# ============================================================
+
 # --- Carbonaceous ---
+# apply the desired carbon mass fraction of the TOTAL dust mass
+fC  = 1./11. #H+19
+dn_da_C_star_eff = fC * dn_da_C_star
+
 kappa_C_abs_star = compute_kappa_lambda(wavelength_c, radii_c, Qabs_c,
-                                        dn_da_C_star)
+                                        dn_da_C_star_eff)
 kappa_C_sca_star = compute_kappa_lambda(wavelength_c, radii_c, Qsca_c,
-                                        dn_da_C_star)
+                                        dn_da_C_star_eff)
 
 # --- Silicate ---
+# apply the desired silicate mass fraction of the TOTAL dust mass
+fSi = 1.-fC
+dn_da_Si_star_eff = fSi * dn_da_Si_star
+
 kappa_Si_abs_star = compute_kappa_lambda(wavelength_s, radii_s, Qabs_s,
-                                         dn_da_Si_star)
+                                         dn_da_Si_star_eff)
 kappa_Si_sca_star = compute_kappa_lambda(wavelength_s, radii_s, Qsca_s,
-                                         dn_da_Si_star)
+                                         dn_da_Si_star_eff)
 
 # put both components on the same λ grid (they *should* match; if not, interp)
 lam_um = wavelength_c  # = wavelength_s
+
 # Total stellar mixture
 kappa_abs_star_tot = kappa_C_abs_star + kappa_Si_abs_star
 kappa_sca_star_tot = kappa_C_sca_star + kappa_Si_sca_star
@@ -732,6 +824,14 @@ kappa_sca_star_tot = kappa_C_sca_star + kappa_Si_sca_star
 kappa_ext_star_tot = kappa_abs_star_tot + kappa_sca_star_tot
 omega_star_tot     = kappa_sca_star_tot / kappa_ext_star_tot   # albedo
 
+# ---- Stellar dust mixture: g_tot_star (scatter-weighted) ----
+g_c_star = compute_g_lambda(lam_um, radii_c, Qsca_c, g_c, dn_da_C_star_eff)
+g_s_star = compute_g_lambda(lam_um, radii_s, Qsca_s, g_s, dn_da_Si_star_eff)
+
+w_c_star = kappa_C_sca_star
+w_s_star = kappa_Si_sca_star
+
+g_tot_star = (g_c_star * w_c_star + g_s_star * w_s_star) / (w_c_star + w_s_star)
 
 
 print('kext_1500_stellar [cm^2/g] -->', kappa_ext_star_tot[lam_A==1585])   
@@ -756,10 +856,11 @@ plt.grid(alpha=0.25)
 plt.tight_layout()
 plt.show()
 
-#-- Ok now that I ma not retarded anymore I can redo Fig. 5 in the paper ----#
+
 
 # ==========================================================
-# Compare MW WD01 vs stellar dust: κ_λ + a^4 dn/da inset
+# FIGURE: Compare MW WD01 vs stellar dust: kappa(lambda)
+# with inset showing a^4 dn/da  (Paper Fig. 5)
 # ==========================================================
 lam_um = wavelength_c                     # = wavelength_s
 lam_A  = lam_um * 1e4                     # µm → Å
@@ -817,6 +918,7 @@ ax.legend(frameon=False, fontsize=16, loc='lower left')
 
 # ==========================================================
 # INSET: 1e29 * a^4 dn/da for WD01 vs stellar dust
+# NOTE: inset is shape-only (lognormal vs WD01); not enforcing the fC/fSi mixture used in kappa/RT.
 # ==========================================================
 inset_ax = ax.inset_axes([0.57, 0.57, 0.4, 0.4])
 
@@ -882,86 +984,37 @@ print("=========================================================\n")
 
 
 
-# -------------------------------------------------------------------
-# 4. Radiative transfer attenuation curves
-# -------------------------------------------------------------------
-# We will implement three geometries:
-## -- ok now we want to show what is the difference between the mw extinction curve 
-# vs. the attanuation curve that we build here via tramission function + the change in GSD and thus in kappa_lambda
-# and we compare with the TNG results from Sommovigo+25
-# 1) Slab geometry with scattering (Henyey-Greenstein)
-# 2) Spherical shell geometry with central source (Code 1973)
-# 3) Spherical geometry with stars mixed with dust (no scattering term)
+# ============================================================
+#  SECTION 7: Radiative transfer attenuation curves
+# ============================================================
+# Compute A(lambda)/A_V for MW and stellar dust using three
+# RT geometries (transmission functions from highz_gal_SAM.py):
+#   1) Sphere with central point source (Code 1973) — "PS"
+#   2) Sphere with stars uniformly mixed with dust — "mixed"
+#   3) Slab with Henyey-Greenstein scattering
+# We compare these model attenuation curves with the parametric
+# TNG+RT fit from Sommovigo+25 (Li+08 modified functional form).
+# Key point: attenuation != extinction; geometry + scattering
+# make the effective curve greyer (flatter) than pure extinction.
+# ============================================================
 
 
-def T_slab(tau_lambda, mu, omega_lambda):
-    """
-    Slab geometry with scattering (Henyey-Greenstein).
-    Parameters
-    ----------
-    tau_lambda : array
-        Optical depth at each wavelength.
-    mu : float
-        cosine of inclination (0 < mu <= 1)
-    omega_lambda : array
-        albedo at each wavelength.
-    """
-    # argument x = (1 - omega) * tau / (2 mu)
-    x = (1. - omega_lambda) * tau_lambda / (2. * mu)
-    return (1./mu) * np.exp(-x) * W_l(x)
+# T_slab, T_sphere_central, T_sphere_mixed are imported from highz_gal_SAM.py
+# (via 'from highz_gal_SAM import *' above)
 
 
-def T_sphere_central(tau_lambda, omega_lambda, g_lambda=0):
-    """
-    Spherical shell geometry with central source (Code 1973).
-    Includes anisotropic scattering.
-    """
-    eta = np.sqrt((1. - omega_lambda) / (1. - omega_lambda * g_lambda))
-    psi = np.sqrt((1. - omega_lambda) * (1. - omega_lambda * g_lambda))
-
-    return 2.0 / ((1. + eta) * np.exp(psi * tau_lambda) +
-                  (1. - eta) * np.exp(-psi * tau_lambda))
-
-
-def T_sphere_mixed(tau_lambda):
-    """
-    Spherical geometry with stars mixed with dust.
-    No scattering term (pure absorption + geometric factor).
-    """
-    return (3./(4.*tau_lambda) *
-            (1. - 1./(2*tau_lambda**2) +
-             (1./tau_lambda + 1./(2*tau_lambda**2)) * np.exp(-2.*tau_lambda)))
-
-
-def compute_g_lambda(wavelength_um, radii_um, Qsca_table, g_sca_table, dn_da):
-    """
-    Compute scattering asymmetry parameter g_lambda averaged over size distribution.
-
-    wavelength_um : (Nλ,)
-    radii_um      : (Na,)
-    Qsca_table    : (Na, Nλ)   scattering efficiency Q_sca(a, λ)
-    g_sca_table   : (Na, Nλ)   <cos θ> for each (a, λ)
-    dn_da         : (Na,)      size distribution (any normalization; cancels out)
-
-    Returns
-    -------
-    g_lambda : (Nλ,)   scattering asymmetry parameter at each λ.
-    """
-    a_cm = radii_um * 1e-4
-    da   = np.gradient(a_cm)
-
-    # weight ∝ π a^2 Q_sca dn/da
-    weight = np.pi * a_cm[:, None]**2 * Qsca_table * dn_da[:, None]  # (Na, Nλ)
-
-    num   = np.sum(weight * g_sca_table * da[:, None], axis=0)   # ∫ π a^2 Q_sca g dn/da da
-    denom = np.sum(weight * da[:, None],                axis=0)   # ∫ π a^2 Q_sca   dn/da da
-
-    g_lambda = num / denom
-    return g_lambda
 
 #for MW dust mixture
-g_tot = compute_g_lambda(lam_um, radii_c, Qsca_c, g_c, dn_da_C) * (1./11.) + \
-        compute_g_lambda(lam_um, radii_s, Qsca_s, g_s, dn_da_Si) * (10./11.)
+# ---- MW dust mixture: g_tot must be SCATTER-weighted, not mass-weighted ----
+g_c_MW  = compute_g_lambda(lam_um, radii_c, Qsca_c, g_c, dn_da_C)
+g_s_MW  = compute_g_lambda(lam_um, radii_s, Qsca_s, g_s, dn_da_Si)
+
+# use the SAME weights you used for the MW kappa_sca mixture
+w_c = (1.0/11.0) * kappa_c_sca
+w_s = (10.0/11.0) * kappa_s_sca
+
+g_tot_MW = (g_c_MW * w_c + g_s_MW * w_s) / (w_c + w_s)
+
 
 def attenuation_curve_RT(lam_um, kappa_ext, omega_lam, g_lam, Sigmad, geometry="sphere_central", mu=0.6):
     """
@@ -989,7 +1042,8 @@ def attenuation_curve_RT(lam_um, kappa_ext, omega_lam, g_lam, Sigmad, geometry="
     return -2.5 * np.log10(T)
 
 
-# we compare to TNG+RT results from Sommovigo+25
+# Parametric attenuation curve from Sommovigo+25 (TNG+RT calibration).
+# Uses a modified Li+08 functional form with AV-dependent coefficients.
 def attenuation_s25(lam_um, AV):
     """
     Compute A_lambda for the Sommovigo+2025 parametric attenuation model.
@@ -1023,15 +1077,26 @@ Sigmad_values = [1e-5, 1e-4, 1e-3]   # g/cm^2
 colors = [plt.cm.magma_r(0.1), plt.cm.magma_r(0.51), plt.cm.magma_r(1.) ]
 
 
-#-------------------------------------------------------------------------------------------
-#--------- New plot for the paper: attenuationc curve compairson, stellar dust and MW dust
-#-------------------------------------------------------------------------------------------
+# ============================================================
+# FIGURE: Attenuation curve comparison — MW dust vs stellar dust
+# Two panels: left = MW (crimson), right = stellar (teal)
+# Each panel shows PS and mixed geometries at A_V = 0.15 and 4.0
+# Left panel also overlays Sommovigo+25 TNG+RT parametric fit
+# ============================================================
 
 fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
 ax_mw, ax_stellar = axes
 
-# Helper: Σ_d from desired A_V
+# Helper: invert A_V = 1.086 * kappa_V * Sigma_d to get Sigma_d
 def sigmad_from_Av(Av_target, kappa_V):
+    """
+    Convert a *screen-equivalent* A_V to Σ_d using A_V = 1.086 * tau_V
+    with tau_V = kappa_V * Σ_d.
+
+    NOTE: For mixed/sphere+scattering transfer functions, the resulting
+    A_V from RT will generally differ from Av_screen. We later normalize
+    curves by A_lambda/A_V using the RT-computed A_V.
+    """
     # A_V = kappa_V * Σ_d * (2.5 / ln10)
     return Av_target / (kappa_V * (2.5 / np.log(10)))
 
@@ -1058,7 +1123,7 @@ ls_map    = {0.15: '--', 4.0: '-'}   # dashed for low A_V, solid for high A_V
 def plot_family(ax, kappa_ext_tot, omega_tot, g_tot,
                 color, title):
     """
-    Plot PS, mixed, Sommovigo+24 for A_V = 0.1 and 1.0
+    Plot PS, mixed, Sommovigo+24 for A_V = 0.1 and 4.0
     using the given dust model (kappa_ext_tot, omega_tot, g_tot).
     """
     kappa_V = kappa_ext_tot[i_V]
@@ -1144,13 +1209,16 @@ def plot_family(ax, kappa_ext_tot, omega_tot, g_tot,
     ax.grid(alpha=0.4, ls='--')
 
 
+
+
+
 # ====== Actual plotting ======
 # ===== LEFT PANEL: MW dust (crimson) =====
 plot_family(
     ax=ax_mw,
     kappa_ext_tot=kappa_ext_tot,
     omega_tot=omega_tot,
-    g_tot=g_tot,
+    g_tot=g_tot_MW,
     color='crimson',
     title="MW dust"
 )
@@ -1160,7 +1228,7 @@ ax_mw.plot(
     lam_ang,
     Li_08(1e-4 * lam_ang, 0., 0., 0., 0., 'MW'),
     color='gray',
-    lw=4,
+    lw=7,
     label='MW Obs. Ext. Curve (Li+08)',
     alpha=0.15,
     zorder=-10000
@@ -1171,7 +1239,7 @@ plot_family(
     ax=ax_stellar,
     kappa_ext_tot=kappa_ext_star_tot,
     omega_tot=omega_star_tot,
-    g_tot=g_tot,
+    g_tot=g_tot_star,
     color='teal',
     title="Stellar dust"
 )
@@ -1192,6 +1260,7 @@ axes[0].set_ylim(0, 10)
 
 # Put legend on the right panel only (labels only for A_V=1)
 ax_mw.legend(loc='best', fontsize=12, frameon=False)
+ax_stellar.legend(loc='best', fontsize=12, frameon=False)
 
 plt.tight_layout()
 plt.show()
@@ -1200,252 +1269,24 @@ plt.show()
 
 
 
-
-
-
-
 # ============================================================
-#  New contour plot: (1 - T_abs) / T_tot as function of ε_* and y_d
-#  for the chosen halo mass and redshift
-# NB: From here on the plots are NOT part of the paper, just extra checks I did
+#  SECTION 8: Save dust constants to txt file
 # ============================================================
-
-
-# ======== INPUT DATA ===========
-# Load SB99 instantaneous burst tables
-logSNr_yr = np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/snr_inst_Z001.txt', usecols=1)
-time_yr = np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/snr_inst_Z001.txt', usecols=0)
-L1500_SB99 = np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/L1500_inst_Z001.txt', usecols=1)
-time_yr_L1500 = np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/L1500_inst_Z001.txt', usecols=0)
-
-
-# ======== HALO MODEL PARAMETERS ===========
-#redshift = 10.0
-#logMh = 10.86#10.86#0.9
-##fb = cosmo.Ob(redshift) / cosmo.Om(redshift)
-
-redshift = 7.0
-logMh = 11.6#10.86#0.9
-fb = cosmo.Ob(redshift) / cosmo.Om(redshift)
-
-tstep = 1  # [Myr]
-len_sp_dis = 1000
-spin_param_distr = np.random.lognormal(mean=np.log(10**-1.5677), sigma=0.5390, size=len_sp_dis)
-
-'''
-#========== FIRST: for a single dust and trasmission funct model ===========
-print("\n==============================================================")
-print(f"Constructing L_IR/L_UV contour grid for:")
-print(f"  - redshift z = {redshift}")
-print(f"  - halo mass log(M_h/Msun) = {logMh:.2f}")
-print(f"  - dust model: stellar dust (kappa_1500, omega_1500)")
-print("  - geometry: sphere_mixed")
-print("  - observable: (1 - T_abs) / T_tot at 1500 Å")
-print("==============================================================\n")
-
-# --- choose the dust model you want to use for the galaxy ---
-# here I assume you want the "stellar dust" mixture as fiducial
-kappa_1500 = kappa_ext_tot[i_UV]      # [cm^2/g]
-omega_1500 = omega_tot[i_UV]
-
-# --- define parameter grids ---
-# tune these ranges/steps as you like
-eps_vals = np.linspace(0.01, 0.2, 25)      # star formation efficiency ε_*
-yd_vals  = np.logspace(-3, -0.5, 25)       # dust yield y_d from 1e-3 to ~0.5
-
-LIR_over_LUV = np.zeros((len(yd_vals), len(eps_vals)))
-
-for ie, eps in enumerate(eps_vals):
-    # SFH depends only on ε_*
-    SFH_e, logMst_build_e, age_e = Build_SFH_funct(10**logMh, redshift, tstep, eps)
-
-    for jy, y_d_val in enumerate(yd_vals):
-        # Dust mass build-up depends on y_d
-        N_SN_arr_e, Md_arr_e = compute_Mdust_steps(
-            age_e, tstep, SFH_e, time_yr, logSNr_yr, y_d_val
-        )
-        M_dust_e = Md_arr_e[-1]  # final dust mass [Msun]
-
-        # Predict τ_1500 distribution for this M_dust
-        tauUV_arr_e = tau_pred(kappa_1500, M_dust_e, 10**logMh, spin_param_distr, redshift)
-
-        # --- optical depths at 1500 Å ---
-        tau_tot_1500 = np.median(tauUV_arr_e)
-        tau_abs_1500 = (1.0 - omega_1500) * tau_tot_1500
-
-        # avoid division by zero / tiny τ
-        if tau_tot_1500 <= 0:
-            LIR_over_LUV[jy, ie] = np.nan
-            continue
-
-        # transmission for pure-absorption "mixed" geometry at 1500 Å
-        # (T_sphere_mixed expects an array; we pass a scalar array)
-        T_abs_1500 = T_sphere_mixed(np.array([tau_abs_1500]))[0]
-        T_tot_1500 = T_sphere_mixed(np.array([tau_tot_1500]))[0]
-        LIR_over_LUV[jy, ie] = (1.0 - T_abs_1500) / T_tot_1500
-
-
-
+# Write key opacity values (kappa_UV, kappa_IR, kappa_V, albedo,
+# asymmetry g) for both MW and stellar dust to a text file.
+# highz_gal_SAM.py reads this file at import time so that the
+# SAM does not need to recompute opacities from Mie theory.
 # ============================================================
-#  Make the contour plot
-# ============================================================
-E_grid, YD_grid = np.meshgrid(eps_vals, yd_vals)
+# --- 1500 Angstrom quantities for both dust mixtures ---
+g_1500_MW   = g_tot_MW[i_UV]
+g_1500_star = g_tot_star[i_UV]
 
-fig, ax = plt.subplots(figsize=(7, 5))
+kUV_MW_ext  = kappa_ext_tot[i_UV]
+kUV_MW_abs  = kappa_abs_tot[i_UV]
 
-# I’d use log10 of the ratio so structure is clearer
-cs = ax.contourf(
-    E_grid, np.log10(YD_grid), np.log10(LIR_over_LUV),
-    levels=20, cmap='magma_r'
-)
-cbar = plt.colorbar(cs, ax=ax)
-cbar.set_label(r'$\log_{10}\left(L_{\rm IR}/L_{\rm UV}\right)$', fontsize=13)
+kUV_st_ext  = kappa_ext_star_tot[i_UV]
+kUV_st_abs  = kappa_abs_star_tot[i_UV]
 
-# optionally overplot a few contour lines
-cs2 = ax.contour(
-    E_grid, np.log10(YD_grid), np.log10(LIR_over_LUV),
-    levels=[-2, -1, 0, 1], colors='k', linewidths=0.8, alpha=0.5
-)
-ax.clabel(cs2, fmt=r'%d', inline=True, fontsize=9)
-
-ax.set_xlabel(r'$\epsilon_\star$', fontsize=14)
-ax.set_ylabel(r'$\log_{10}(y_{\mathrm{d}})$', fontsize=14)
-ax.set_title(
-    rf'$z={redshift:.1f},\ \log M_{{\rm h}}/M_\odot = {logMh:.2f}$',
-    fontsize=14
-)
-
-plt.tight_layout()
-plt.show()
-'''
-
-
-
-
-#=========== AFTER: comparing all dust and tramission function models
-print("\n==============================================================")
-print(f"Constructing L_IR/L_UV contour grids for:")
-print(f"  - redshift z = {redshift}")
-print(f"  - halo mass log(M_h/Msun) = {logMh:.2f}")
-print("  - dust models: MW dust (top row) and stellar dust (bottom row)")
-print("  - geometries / models per column:")
-print("      [1] sphere_mixed")
-print("      [2] point source (sphere_central)")
-print("      [3] Sommovigo+25 attenuation curve")
-print("  - observable: (1 - T_abs) / T_tot at 1500 Å")
-print("==============================================================\n")
-
-# --- parameter grids (new ranges) ---
-eps_vals = np.linspace(1e-2, 0.3, 25)       # ε_* from 0.01 to 0.5
-yd_vals  = np.logspace(-3, -0.4, 25)        # y_d from 1e-3 to 10^-0.5
-E_grid, YD_grid = np.meshgrid(eps_vals, yd_vals)
-
-# --- precompute SFH for each epsilon (same for all dust models) ---
-SFH_list  = []
-age_list  = []
-
-for ie, eps in enumerate(eps_vals):
-    print(f"> Precomputing SFH for ε_* = {eps:.3f} ...")
-    SFH_e, logMst_build_e, age_e = Build_SFH_funct(
-        10**logMh, redshift, tstep, eps
-    )
-    SFH_list.append(SFH_e)
-    age_list.append(age_e)
-
-print("> SFH precomputation done. Now building L_IR/L_UV grids...\n")
-
-# Add this global once, if you still want a one-time warning later (optional)
-s25_Av_warning_printed = False
-
-def compute_grid_for_dust(kappa_1500, kappa_V, omega_1500, mode_label, return_Av=False):
-    """
-    Compute L_IR/L_UV grid for a given dust model at 1500 Å and geometry/model.
-
-    If return_Av=True and mode_label == 's25', also return the effective A_V grid
-    (used to highlight the calibration range of Sommovigo+25).
-
-    Sommovigo+25 fitting relations are calibrated only for:
-        10^{-3} <= A_V <= 10
-    """
-    global s25_Av_warning_printed
-
-    L_grid  = np.zeros((len(yd_vals), len(eps_vals)))
-    AV_grid = None
-    if return_Av:
-        AV_grid = np.full((len(yd_vals), len(eps_vals)), np.nan)
-
-    for ie, eps in enumerate(eps_vals):
-        SFH_e  = SFH_list[ie]
-        age_e  = age_list[ie]
-
-        for jy, y_d_val in enumerate(yd_vals):
-            # Dust mass build-up depends on y_d
-            N_SN_arr_e, Md_arr_e = compute_Mdust_steps(
-                age_e, tstep, SFH_e, time_yr, logSNr_yr, y_d_val
-            )
-            M_dust_e = Md_arr_e[-1]  # final dust mass [Msun]
-
-            # Predict τ_1500 distribution for this M_dust
-            tauUV_arr_e = tau_pred(
-                kappa_1500, M_dust_e, 10**logMh, spin_param_distr, redshift
-            )
-
-            tau_tot_1500 = np.median(tauUV_arr_e)
-
-            if tau_tot_1500 <= 0:
-                L_grid[jy, ie] = np.nan
-                continue
-
-            if mode_label in ['mixed', 'ps']:
-                tau_abs_1500 = (1.0 - omega_1500) * tau_tot_1500
-
-                if mode_label == 'mixed':
-                    T_abs_1500 = T_sphere_mixed(np.array([tau_abs_1500]))[0]
-                    T_tot_1500 = T_sphere_mixed(np.array([tau_tot_1500]))[0]
-
-                elif mode_label == 'ps':
-                    T_abs_1500 = T_sphere_central(
-                        np.array([tau_abs_1500]),
-                        omega_lambda=omega_1500
-                    )[0]
-                    T_tot_1500 = T_sphere_central(
-                        np.array([tau_tot_1500]),
-                        omega_lambda=omega_1500
-                    )[0]
-
-                L_grid[jy, ie] = (1.0 - T_abs_1500) / T_tot_1500
-
-            elif mode_label == 's25':
-                # τ_1500 = kappa_1500 * Σ_d  ->  Σ_d = τ_1500 / kappa_1500
-                # τ_V    = kappa_V * Σ_d     ->  τ_V = τ_1500 * (kappa_V / kappa_1500)
-                tau_V   = tau_tot_1500 * (kappa_V / kappa_1500)
-
-                # A_V = 1.086 * τ_V = (2.5 / ln 10) * τ_V
-                AV_eff  = (2.5 / np.log(10.0)) * tau_V
-
-                if return_Av:
-                    AV_grid[jy, ie] = AV_eff
-
-                # Still compute L_grid everywhere; we’ll *visualize* validity with hatching
-                A_lam_over_Av = attenuation_s25(lam_um, AV_eff)
-                A1500_s25     = A_lam_over_Av[i_UV] * AV_eff
-
-                T_tot_1500 = 10.0**(-0.4 * A1500_s25)
-                T_abs_1500 = T_tot_1500
-
-                L_grid[jy, ie] = (1.0 - T_abs_1500) / T_tot_1500
-
-            else:
-                raise ValueError("Unknown mode_label")
-
-    if return_Av:
-        return L_grid, AV_grid
-    else:
-        return L_grid
-
-
-
-# --- 1500 Å quantities for both dust mixtures ---
 kappa_1500_MW     = kappa_ext_tot[i_UV]
 omega_1500_MW     = omega_tot[i_UV]
 kappa_V_MW      = kappa_ext_tot[i_V]
@@ -1454,404 +1295,25 @@ kappa_1500_star   = kappa_ext_star_tot[i_UV]
 omega_1500_star   = omega_star_tot[i_UV]
 kappa_V_star    = kappa_ext_star_tot[i_V]
 
-# --- build all six grids ---
-print("> MW dust: sphere_mixed")
-L_MW_mixed  = compute_grid_for_dust(kappa_1500_MW,   kappa_V_MW,   omega_1500_MW,   'mixed')
-
-print("> MW dust: point source (sphere_central)")
-L_MW_ps     = compute_grid_for_dust(kappa_1500_MW,   kappa_V_MW,   omega_1500_MW,   'ps')
-
-print("> MW dust: Sommovigo+25 attenuation")
-L_MW_s25, AV_MW_s25 = compute_grid_for_dust(
-    kappa_1500_MW, kappa_V_MW, omega_1500_MW, 's25', return_Av=True
+dust_constants_path = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "txt_files", "Outputs/dust_constants.txt"
 )
+with open(dust_constants_path, 'w') as fc:
+    fc.write("# Dust opacity and scattering constants at key wavelengths\n")
+    fc.write("# Computed by dust_JWST_z10_GSD.py — do not edit by hand\n")
+    fc.write(f"kUV_drn       {float(kUV_drn):.8f}\n")
+    fc.write(f"kUV_drn_abs   {float(kUV_MW_abs):.8f}\n")
+    fc.write(f"kv_drn        {float(kv_drn):.8f}\n")
+    fc.write(f"kIR_drn       {float(kIR_drn):.8f}\n")
+    fc.write(f"omega_1500_drn {float(omega_1500_MW):.8f}\n")
+    fc.write(f"g_1500_drn    {float(g_1500_MW):.8f}\n")
+    fc.write(f"kUV_hir       {float(kUV_hir):.8f}\n")
+    fc.write(f"kUV_hir_abs   {float(kUV_st_abs):.8f}\n")
+    fc.write(f"kv_hir        {float(kv_hir):.8f}\n")
+    fc.write(f"kIR_hir       {float(kIR_hir):.8f}\n")
+    fc.write(f"omega_1500_hir {float(omega_1500_star):.8f}\n")
+    fc.write(f"g_1500_hir    {float(g_1500_star):.8f}\n")
+print(f"\n> Dust constants saved to {dust_constants_path}")
 
-print("> Stellar dust: sphere_mixed")
-L_star_mixed = compute_grid_for_dust(kappa_1500_star, kappa_V_star, omega_1500_star, 'mixed')
 
-print("> Stellar dust: point source (sphere_central)")
-L_star_ps    = compute_grid_for_dust(kappa_1500_star, kappa_V_star, omega_1500_star, 'ps')
-
-print("> Stellar dust: Sommovigo+25 attenuation")
-L_star_s25, AV_star_s25 = compute_grid_for_dust(
-    kappa_1500_star, kappa_V_star, omega_1500_star, 's25', return_Av=True
-)
-
-print("\n> Completed all grids. Now generating 2x3 contour plot...\n")
-
-
-# ============================================================
-#  2 x 3 CONTOUR PLOT with log norm and saturation outside [1e-2, 1e2]. 
-# ============================================================
-def clip_positive(x, tiny=1e-6):
-    arr = np.array(x, copy=True, dtype=float)
-    arr[arr <= 0] = tiny
-    return arr
-
-R_MW_mixed   = clip_positive(L_MW_mixed)
-R_MW_ps      = clip_positive(L_MW_ps)
-R_MW_s25     = clip_positive(L_MW_s25)
-R_star_mixed = clip_positive(L_star_mixed)
-R_star_ps    = clip_positive(L_star_ps)
-R_star_s25   = clip_positive(L_star_s25)
-
-# log-normalization for R
-vmin_R = 1e-2
-vmax_R = 1e2
-norm   = matplotlib.colors.LogNorm(vmin=vmin_R, vmax=vmax_R)
-
-cmap_MW   = plt.get_cmap('coolwarm').copy()
-cmap_star = plt.get_cmap('coolwarm').copy()
-cmap_MW.set_over(cmap_MW(1.0))
-cmap_MW.set_under(cmap_MW(0.0))
-cmap_star.set_over(cmap_star(1.0))
-cmap_star.set_under(cmap_star(0.0))
-
-levels_R = np.logspace(-2, 2, 20)
-
-fig, axes = plt.subplots(2, 3, figsize=(15, 8), sharex=True, sharey=True)
-
-titles_cols = [
-    r"Mixed geometry ($T_{\rm sphere,mix}$)",
-    r"Point source ($T_{\rm sphere,central}$)",
-    r"Sommovigo+25 attenuation"
-]
-
-# top: MW
-cs00 = axes[0,0].contourf(E_grid, np.log10(YD_grid), R_MW_mixed, levels=levels_R,
-                          cmap=cmap_MW, norm=norm, extend='both')
-cs01 = axes[0,1].contourf(E_grid, np.log10(YD_grid), R_MW_ps, levels=levels_R,
-                          cmap=cmap_MW, norm=norm, extend='both')
-cs02 = axes[0,2].contourf(E_grid, np.log10(YD_grid), R_MW_s25, levels=levels_R,
-                          cmap=cmap_MW, norm=norm, extend='both')
-
-# bottom: stellar dust
-cs10 = axes[1,0].contourf(E_grid, np.log10(YD_grid), R_star_mixed, levels=levels_R,
-                          cmap=cmap_star, norm=norm, extend='both')
-cs11 = axes[1,1].contourf(E_grid, np.log10(YD_grid), R_star_ps, levels=levels_R,
-                          cmap=cmap_star, norm=norm, extend='both')
-cs12 = axes[1,2].contourf(E_grid, np.log10(YD_grid), R_star_s25, levels=levels_R,
-                          cmap=cmap_star, norm=norm, extend='both')
-
-panel_data = [
-    [R_MW_mixed, R_MW_ps, R_MW_s25],
-    [R_star_mixed, R_star_ps, R_star_s25]
-]
-
-
-#   ADD LIR = LUV LINE TO ALL PANELS (after contourf)
-R_equal = 1.0
-
-for i in range(2):
-    for j in range(3):
-        axes[i,j].contour(
-            E_grid, np.log10(YD_grid), panel_data[i][j],
-            levels=[R_equal],
-            colors='grey',
-            linestyles=':',
-            linewidths=2,
-            alpha=0.6,
-            norm=norm
-        )
-
-
-#   ADD STAR MARKERS (ε★ = 0.05, 0.1, 0.2 × y_d = 0.02, 0.3)
-eps_points = [0.05, 0.10, 0.20]
-yd_points  = [0.02, 0.3]
-
-for eps in eps_points:
-    for yd in yd_points:
-        for i in range(2):
-            for j in range(3):
-                axes[i,j].scatter(eps, np.log10(yd), marker='*', s=200, color='white',edgecolors='black',linewidth=0.2, zorder=50,alpha=0.7)
-
-
-#   LABELS, HATCHING, COLORBARS
-# titles
-for j in range(3):
-    axes[0,j].set_title(titles_cols[j], fontsize=16)
-
-axes[0,0].set_ylabel(r"MW dust: $\log_{10}(y_{\rm d})$", fontsize=18)
-axes[1,0].set_ylabel(r"Stellar dust: $\log_{10}(y_{\rm d})$", fontsize=18)
-
-for j in range(3):
-    axes[1,j].set_xlabel(r'$\epsilon_\star$', fontsize=18)
-
-# hatching for s25
-valid_min, valid_max = 1e-3, 5.0
-mask_MW_int   = ((AV_MW_s25 < valid_min) | (AV_MW_s25 > valid_max)).astype(int)
-mask_star_int = ((AV_star_s25 < valid_min) | (AV_star_s25 > valid_max)).astype(int)
-
-axes[0,2].contourf(E_grid, np.log10(YD_grid), mask_MW_int,
-                   levels=[0.5, 1.5], hatches=['///'],
-                   colors='white', linewidths=0)
-axes[1,2].contourf(E_grid, np.log10(YD_grid), mask_star_int,
-                   levels=[0.5, 1.5], hatches=['///'],
-                   colors='white', linewidths=0)
-
-# colorbars
-ticks_R = [1e-2, 1e-1, 1, 1e1, 1e2]
-
-cbar_MW = fig.colorbar(cs00, ax=axes[0,:], fraction=0.03, pad=0.12)
-cbar_MW.set_label(r'$ L_{\rm IR}/L_{\rm UV} = (1 - T_{\rm abs})/T_{\rm tot}$', fontsize=18)
-cbar_MW.set_ticks(ticks_R)
-cbar_MW.set_ticklabels([r'$10^{-2}$', r'$10^{-1}$', r'$10^{0}$', r'$10^{1}$', r'$10^{2}$'])
-
-cbar_star = fig.colorbar(cs10, ax=axes[1,:], fraction=0.03, pad=0.12)
-cbar_star.set_label(r'$  L_{\rm IR}/L_{\rm UV} = (1 - T_{\rm abs})/T_{\rm tot}$', fontsize=18)
-cbar_star.set_ticks(ticks_R)
-cbar_star.set_ticklabels([r'$10^{-2}$', r'$10^{-1}$', r'$10^{0}$', r'$10^{1}$', r'$10^{2}$'])
-
-plt.suptitle(rf'$z={redshift:.1f},\ \log M_h/M_\odot = {logMh:.2f}$',
-             fontsize=16, y=0.98)
-
-plt.tight_layout(rect=[0,0,1,0.96])
-plt.show()
-
-
-
-
-
-
-#-- Now I want to check given two points in a degenrate space of Lir/Luv,
-#-- if they are also degenerate in LIR and LUV not just the ratio. My guess is not
-
-def compute_observables_for_point(eps, y_d_val,
-                                  kappa_1500, omega_1500,
-                                  geometry="mixed",
-                                  label=""):
-    """
-    Compute L_IR/L_UV, M_UV(attenuated), and L_IR (in arbitrary units)
-    for a single (eps, y_d) point, for the given dust model at 1500 Å.
-    """
-
-    # ---------- SFH and dust mass ----------
-    SFH_e, logMst_build_e, age_e = Build_SFH_funct(
-        10**logMh, redshift, tstep, eps
-    )
-
-    N_SN_arr_e, Md_arr_e = compute_Mdust_steps(
-        age_e, tstep, SFH_e, time_yr, logSNr_yr, y_d_val
-    )
-    M_dust_e = Md_arr_e[-1]
-
-    # ---------- tau distribution at 1500 Å ----------
-    tauUV_arr_e = tau_pred(
-        kappa_1500, M_dust_e, 10**logMh, spin_param_distr, redshift
-    )
-    tau_tot_1500 = np.median(tauUV_arr_e)
-    tau_abs_1500 = (1.0 - omega_1500) * tau_tot_1500
-
-    if geometry == "mixed":
-        T_abs_1500 = T_sphere_mixed(np.array([tau_abs_1500]))[0]
-        T_tot_1500 = T_sphere_mixed(np.array([tau_tot_1500]))[0]
-    elif geometry == "ps":
-        T_abs_1500 = T_sphere_central(
-            np.array([tau_abs_1500]),
-            omega_lambda=omega_1500
-        )[0]
-        T_tot_1500 = T_sphere_central(
-            np.array([tau_tot_1500]),
-            omega_lambda=omega_1500
-        )[0]
-    else:
-        raise ValueError("Unknown geometry")
-
-    # ---------- intrinsic UV luminosity ----------
-    # Here we just scale L_UV,int ∝ SFR or final stellar mass.
-    # If you already have a more exact L1500(SFH) convolution, plug that in.
-    Mstar_final = 10**logMst_build_e[-1]
-    LUV_int = Mstar_final  # arbitrary proportional units; you can change
-
-    LUV_out = T_tot_1500 * LUV_int
-    LIR     = (1.0 - T_abs_1500) * LUV_int
-
-    R = LIR / LUV_out  # this should match the colour R at that point
-
-    # convert to something like an AB magnitude (up to a constant)
-    # M_UV ∝ -2.5 log10(LUV_out)
-    MUV_att = -2.5 * np.log10(LUV_out)
-
-    print("\n---", label, "---")
-    print(f"eps = {eps:.3f}, y_d = {y_d_val:.3f}")
-    print(f"tau_tot,1500 = {tau_tot_1500:.3f}")
-    print(f"T_tot(1500) = {T_tot_1500:.3e}")
-    print(f"(1 - T_abs)/T_tot ~ LIR/LUV = {R:.3f}")
-    print(f"M_UV, attenuated (arb zero point) = {MUV_att:.3f}")
-    print(f"L_IR (arb units) = {LIR:.3e}")
-    return R, MUV_att, LIR
-
-
-# Example: two degenerate points from your plot (you can adjust to ones you know are similar R)
-R1, MUV1, LIR1 = compute_observables_for_point(
-    eps=0.1, y_d_val=0.30,
-    kappa_1500=kappa_1500_MW, omega_1500=omega_1500_MW,
-    geometry="mixed",
-    label="Point A"
-)
-
-R2, MUV2, LIR2 = compute_observables_for_point(
-    eps=0.30, y_d_val=0.1,  # choose such that they sit in same colour band
-    kappa_1500=kappa_1500_MW, omega_1500=omega_1500_MW,
-    geometry="mixed",
-    label="Point B"
-)
-
-
-
-
-
-
-#------------------------------------------------------------
-#------ Computing scatter in LUV/LIR due to turbulence
-#------------------------------------------------------------
-
-from scipy.stats import norm  # make sure this import exists
-
-# =============================
-# LF-consistent scatter grid in log10(LIR/LUV)
-# =============================
-
-Mach_here = 30        # set the turbulence Mach you want
-K_SPINS   = 21        # match your LF knob (used to estimate geometry scatter)
-N_LOS     = 800       # LOS draws for the ratio distribution (can be 400–2000)
-K_U       = 24        # quadrature nodes for IR (match LF)
-
-# --- build spin quantiles exactly like LF ---
-mu_ln_spin, sig_ln_spin = np.log(10**-1.5677), 0.5390
-u_left  = (np.arange(1, (K_SPINS//2)+1) - 0.5) / K_SPINS
-u_mid   = np.array([0.5])
-u_right = 1.0 - u_left[::-1]
-u_spin  = np.concatenate([u_left, u_mid, u_right])          # length K_SPINS
-z_spin  = norm.ppf(u_spin)
-spin_quant = np.exp(mu_ln_spin + sig_ln_spin*z_spin)        # (K_SPINS,)
-mid_idx = K_SPINS // 2
-
-# --- turbulence width σ_turb in ln Σ ---
-def sigma_ln_from_Mach(Mach):
-    R = compute_R(Mach)
-    return np.sqrt(np.log(1.0 + (R * Mach**2) / 4.0))
-
-sigma_turb = sigma_ln_from_Mach(Mach_here)
-
-# --- Gauss–Legendre nodes for IR integral (in z-space) ---
-xu, wu  = np.polynomial.legendre.leggauss(K_U)
-u_nodes = np.clip(0.5*(xu+1.0), 1e-12, 1-1e-12)
-w_nodes = 0.5*wu
-z_nodes = norm.ppf(u_nodes)
-
-# --- deterministic LOS quantiles for UV draws (noise-free-ish) ---
-u_los = (np.arange(1, N_LOS+1) - 0.5) / N_LOS
-z_los = norm.ppf(u_los)
-
-def delta_logR_for_point(Mh, redshift, SFH_e, age_e, y_d_val,
-                         kUV_ext_1500, kUV_abs_1500):
-    """
-    LF-consistent scatter metric:
-    ΔlogR = p84(log10(LIR/LUV)) - p16(log10(LIR/LUV)),
-    where:
-      - LIR uses quadrature average over Σ lognormal (same as IR LF)
-      - LUV uses LOS draws over Σ lognormal (same as UV LF)
-    """
-
-    # ---- intrinsic UV (per halo) ----
-    L1500 = compute_L1500_steps(age_e, tstep, SFH_e, time_yr_L1500, L1500_SB99)[-1]
-
-    # ---- dust mass for this yd ----
-    _, Md_arr_e = compute_Mdust_steps(age_e, tstep, SFH_e, time_yr, logSNr_yr, y_d_val)
-    Md = Md_arr_e[-1]
-
-    # ---- geometry Σ scatter from spins (exactly LF) ----
-    tauK   = tau_pred(kUV_ext_1500, Md, Mh, spin_quant, redshift)  # (K_SPINS,)
-    SigmaK = tauK / kUV_ext_1500
-
-    lnSigmaK = np.log(SigmaK)
-    Sigma0   = np.exp(np.mean(lnSigmaK))      # geometric mean
-    sigma_g  = np.std(lnSigmaK)               # geometry scatter in ln Σ
-
-    # ---- combine geometry + turbulence ----
-    sigma_eff = np.sqrt(sigma_g**2 + sigma_turb**2)
-    mu_lnSigma = np.log(Sigma0)
-
-    # ===========================
-    # IR: average absorbed fraction (quadrature)
-    # ===========================
-    x_nodes = np.exp(mu_lnSigma + sigma_eff * z_nodes)          # Σ nodes
-    T_abs_nodes = T_1500_sphere_im(kUV_abs_1500 * x_nodes)      # IMPORTANT: kUV_abs
-    f_abs = np.sum(w_nodes * (1.0 - T_abs_nodes))               # ⟨1 - T_abs⟩
-
-    # "LF LIR": same proportionality as your LF (factor cancels in ratio if you keep LUV in L1500 units)
-    LIR = L1500 * f_abs * (3e10/(1500e-8))  # erg/s  (same as your LF)
-
-    # ===========================
-    # UV: LOS draws (quantiles) for emergent L1500
-    # ===========================
-    Sigma_draw = np.exp(mu_lnSigma + sigma_eff * z_los)
-    T_tot_draw = T_1500_sphere_im(kUV_ext_1500 * Sigma_draw)    # IMPORTANT: kUV_ext
-    LUV_draw   = L1500 * T_tot_draw                             # erg/s/Hz
-
-    # Put ratio in consistent units: convert LUV_draw to erg/s by multiplying by nu_1500
-    nu_1500 = (3e10/(1500e-8))
-    LUVbol_draw = LUV_draw * nu_1500
-
-    logR = np.log10(LIR / np.clip(LUVbol_draw, 1e-80, None))
-    p16, p84 = np.percentile(logR, [16, 84])
-    return (p84 - p16)
-
-
-def build_scatter_grid_for_dust(label, kUV_ext_1500, kUV_abs_1500):
-    Scatter = np.full((len(yd_vals), len(eps_vals)), np.nan)
-
-    print(f"\n> Building scatter grid for {label} at Mach={Mach_here} ...")
-    for ie, eps in enumerate(eps_vals):
-        # use your precomputed SFH/age if available:
-        if 'SFH_list' in globals() and 'age_list' in globals():
-            SFH_e  = SFH_list[ie]
-            age_e  = age_list[ie]
-        else:
-            SFH_e, _, age_e = Build_SFH_funct(10**logMh, redshift, tstep, eps)
-
-        for jy, y_d_val in enumerate(yd_vals):
-            Scatter[jy, ie] = delta_logR_for_point(
-                Mh=10**logMh, redshift=redshift,
-                SFH_e=SFH_e, age_e=age_e, y_d_val=y_d_val,
-                kUV_ext_1500=kUV_ext_1500, kUV_abs_1500=kUV_abs_1500
-            )
-    return Scatter
-
-
-# ---- 1500Å opacities for each dust mixture (match LF usage) ----
-kUV_MW_ext  = kappa_ext_tot[i_UV]
-kUV_MW_abs  = kappa_abs_tot[i_UV]
-
-kUV_st_ext  = kappa_ext_star_tot[i_UV]
-kUV_st_abs  = kappa_abs_star_tot[i_UV]
-
-Scatter_MW   = build_scatter_grid_for_dust("MW dust",      kUV_MW_ext, kUV_MW_abs)
-Scatter_star = build_scatter_grid_for_dust("Stellar dust", kUV_st_ext, kUV_st_abs)
-
-# =============================
-# Plot (1x2): scatter only
-# =============================
-E_grid, YD_grid = np.meshgrid(eps_vals, yd_vals)
-
-fig, ax = plt.subplots(1, 2, figsize=(12.5, 5.0), sharey=True)
-
-cs0 = ax[0].contourf(E_grid, np.log10(YD_grid), Scatter_MW, levels=20, cmap='magma')
-cs1 = ax[1].contourf(E_grid, np.log10(YD_grid), Scatter_star, levels=20, cmap='viridis')
-
-ax[0].set_title(rf"MW dust, $\mathcal{{M}}={Mach_here}$")
-ax[1].set_title(rf"Stellar dust, $\mathcal{{M}}={Mach_here}$")
-
-for a in ax:
-    a.set_xlabel(r'$\epsilon_\star$')
-ax[0].set_ylabel(r'$\log_{10}(y_{\rm d})$')
-
-c0 = fig.colorbar(cs0, ax=ax[0], fraction=0.05, pad=0.04)
-c1 = fig.colorbar(cs1, ax=ax[1], fraction=0.05, pad=0.04)
-c0.set_label(r'$\Delta \log_{10}(L_{\rm IR}/L_{\rm UV})$ (84–16)')
-c1.set_label(r'$\Delta \log_{10}(L_{\rm IR}/L_{\rm UV})$ (84–16)')
-
-plt.suptitle(rf'$z={redshift:.1f},\ \log M_h/M_\odot={logMh:.2f}$', y=1.02)
-plt.tight_layout()
-plt.show()

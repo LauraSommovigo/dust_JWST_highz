@@ -1,10 +1,23 @@
+# ============================================================
+# dust_JWST_z10_clumpy_ISM.py
+# ============================================================
+# Studies how ISM turbulence affects dust attenuation.
+# A uniform dust shell (as in the other scripts) is replaced by
+# a log-normal distribution of dust surface densities Sigma_d,
+# parameterised by the turbulent Mach number (Fischera & Dopita 2004).
+# Higher Mach -> wider log-normal -> some sightlines are optically
+# thin even if the average is optically thick -> galaxy appears
+# brighter in UV but with a broader MUV distribution.
+#
+# Main outputs:
+#   1) Two-panel figure: Sigma_d and MUV PDFs at different Mach numbers
+#   2) Far-IR SED comparison for MW vs stellar dust at Mach=10,100
+# ============================================================
 
-from xml.parsers.expat import model
 from scipy.integrate import quad
 from matplotlib import cm
 col_f = cm.get_cmap('gray')
 from librerie import *
-fold_in = '../'
 from highz_gal_SAM import *
 from general import name_and_save, increase_ticklabels, set_labels, do_minorticks, do_log, equal_axes, \
     set_colorbar_labels, set_ticklabels
@@ -13,16 +26,19 @@ from matplotlib.collections import PatchCollection
 import matplotlib.gridspec as gridspec
 from scipy.stats import norm, gaussian_kde
 
-# ======== CONSTANTS ===========        # Msun in grams
-mu = 2.0                 # mean molecular weight (not used anymore)
-bd=2.03
-kUV=kUV_drn #cm^2/g
-kUV_abs=kUV_drn_abs
-kV=kv_drn
+# ======== DUST CONSTANTS ===========
+# Loaded from highz_gal_SAM.py, originally computed in GSD.py
+bd=2.03              # dust emissivity index beta_d
+kUV=kUV_drn          # UV extinction opacity [cm^2/g] (MW dust)
+kUV_abs=kUV_drn_abs  # UV absorption opacity (extinction * (1 - albedo))
+kV=kv_drn            # V-band extinction opacity [cm^2/g]
 
-##############################################
-##########   DUST DISTRIBUTIONS    ###########
-##############################################
+# ============================================================
+#  SECTION 1: Grain size distribution (Draine+03, MW silicates)
+# ============================================================
+# These functions are only used for plotting the GSD shape;
+# the actual kappa values come from GSD.py tables.
+# ============================================================
 
 def dn_da(a):
     """
@@ -39,6 +55,14 @@ def dn_da(a):
     else:
         return (cs / ats**alphas) * a**(alphas - 1) / (1 - bs * a / ats) * \
                np.exp(-((a - ats) / acs)**3)
+
+def massagrain_cgs(a):
+    """
+    Mass of a spherical dust grain of radius a (in cm).
+    Assumes silicate density of 3.5 g/cm^3.
+    """
+    d = 3.5  # g/cm^3
+    return (4.0 / 3.0) * np.pi * a**3 * d
 
 def dn_da_massg(a):
     """
@@ -64,25 +88,23 @@ def na3(a):
         weights[s - 1] = quad(dn_da_massg, a[s - 1], a[s])[0]
     return weights / np.sum(weights)
 
-def massagrain_cgs(a):
-    """
-    Mass of a spherical dust grain of radius a (in cm).
-    Assumes silicate density of 3.5 g/cm^3.
-    """
-    d = 3.5  # g/cm^3
-    return (4.0 / 3.0) * np.pi * a**3 * d
 ##############################################
 
 
 # ======== INPUT DATA ===========
 # Load SB99 instantaneous burst tables
-logSNr_yr = np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/snr_inst_Z001.txt', usecols=1)
-time_yr = np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/snr_inst_Z001.txt', usecols=0)
-L1500_SB99 = np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/L1500_inst_Z001.txt', usecols=1)
-time_yr_L1500 = np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/L1500_inst_Z001.txt', usecols=0)
+logSNr_yr = np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99/snr_inst_Z001.txt'), usecols=1)
+time_yr = np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99/snr_inst_Z001.txt'), usecols=0)
+L1500_SB99 = np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99/L1500_inst_Z001.txt'), usecols=1)
+time_yr_L1500 = np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99/L1500_inst_Z001.txt'), usecols=0)
 
 
-# ======== HALO MODEL PARAMETERS ===========
+# ============================================================
+#  SECTION 2: Halo model setup
+# ============================================================
+# Pick a single characteristic halo, build its SFH, and compute
+# the final dust mass, L_UV, and tau_UV from the spin distribution.
+# ============================================================
 redshift = 7.0
 logMh = 11.6#10.86#0.9
 fb = cosmo.Ob(redshift) / cosmo.Om(redshift)
@@ -110,8 +132,17 @@ L1500_lambda = Lintr * c / (1500.**2 * 1e-8)  # erg/s/Å
 print('MUV (intrinsic) -->', MUV_intr)
 
 
-# ======== BUILD DUST SURFACE DENSITY DISTRIBUTION ===========
-### === Setting up shell model with log-normal surface density fluctuations ===
+# ============================================================
+#  SECTION 3: Turbulent Sigma_d distribution
+# ============================================================
+# For a uniform shell: Sigma_d = Mdust / (pi * rd^2), one value
+# per halo/spin combination.
+# Turbulence creates a LOG-NORMAL spread in Sigma_d along
+# different lines of sight (Fischera & Dopita 2004):
+#   sigma_ln^2 = ln(1 + R * Mach^2 / 4)
+# where R = R(Mach, alpha) from Thompson+16 (in highz_gal_SAM.py).
+# Higher Mach -> wider distribution -> more scatter in tau and MUV.
+# ============================================================
 
 # Fixed total dust mass [Msun]
 M_dust = Md_arr[-1]
@@ -127,7 +158,7 @@ Sigmad_arr = tauUV_arr / kUV  # g/cm^2
 # Log-normal draw for sigma_d, width set by Mach number
 #Mach=3000  # turbulent Mach number
 Sigmad_distr_10 = draw_sigma_distribution(mu_sigma=np.median(Sigmad_arr), Mach=10)
-Sigmad_distr_300 = draw_sigma_distribution(mu_sigma=np.median(Sigmad_arr), Mach=300)
+Sigmad_distr_100 = draw_sigma_distribution(mu_sigma=np.median(Sigmad_arr), Mach=100)
 
 
 
@@ -155,14 +186,21 @@ pdf_y_10 = np.log(10) * x_vals * lognormal_pdf_x(x_vals, mu_ln_10, sigma_ln_10)
 
 
 
-# -----------------------------
-# 1) Build MUV distributions for spin-only and for Mach=10,300
-# -----------------------------
+# ============================================================
+#  SECTION 4: MUV distributions — spin scatter vs turbulence
+# ============================================================
+# Two sources of scatter in attenuated MUV:
+#   a) Galaxy-to-galaxy: different spin -> different rd -> different Sigma_d
+#   b) Line-of-sight (LOS): turbulence within a single galaxy
+# We combine both using K_SPINS seed quantiles from the spin-driven
+# Sigma_d array, and for each seed draw N_LOS sightlines from the
+# lognormal turbulent distribution.
+# ============================================================
 K_SPINS   = 13      # odd, so we include the exact median seed (u=0.5)
 W_BLEND   = 0.6     # blend between median-seed transmission and mean over seeds
 N_LOS     = 600     # LOS draws per Mach (distributed across seeds)
 albedo    = 0.3807
-Mach_array = np.array([5, 10, 20, 30, 40, 50, 100, 200, 300])
+Mach_array = np.array([5, 10, 20, 30, 40, 50, 100])
 
 # exact-median spin seed and symmetric quantiles (data-driven via Sigmad_arr)
 u_left  = (np.arange(1, (K_SPINS//2)+1) - 0.5) / K_SPINS
@@ -178,10 +216,7 @@ def sigma_ln_from_Mach(Mach):
 
 
 # --- Spin-driven (no turbulent scatter): use uniform shell with spin spread ---
-tauUV_arr = tau_pred(kUV, Md_arr[-1], 10**logMh, spin_param_distr, redshift)
-Sigmad_arr = tauUV_arr / kUV  # [g/cm^2]
-
-T_1500_uniform = T_1500_sphere_im(tauUV_arr)   # one value per halo/spin
+T_1500_uniform = T_sphere_mixed(tauUV_arr)   # one value per halo/spin
 L1500_uniform  = Lintr * T_1500_uniform
 MUV_spin = -2.5 * np.log10(L1500_uniform) + 51.60
 
@@ -198,7 +233,7 @@ def get_MUV_clumpy(Mach):
     # Σ_d LOS, then τ, then T, then LUV
     Sigmad_LOS = np.exp(np.log(mu_sigmas)[:, None] + sigma_ln * z_los)  # (K_SPINS, N_LOS)
     tauUV_LOS  = kUV * Sigmad_LOS
-    T_uv_LOS   = T_1500_sphere_im(tauUV_LOS)
+    T_uv_LOS   = T_sphere_mixed(tauUV_LOS)
     LUV_LOS    = Lintr * T_uv_LOS
     LUV_draws  = LUV_LOS.ravel()
 
@@ -209,11 +244,11 @@ def get_MUV_clumpy(Mach):
 # ------------------------------------
 MUV_clumpy_10   = get_MUV_clumpy(10)
 MUV_clumpy_30   = get_MUV_clumpy(30)
+MUV_clumpy_50  = get_MUV_clumpy(50)
 MUV_clumpy_100  = get_MUV_clumpy(100)
-MUV_clumpy_300  = get_MUV_clumpy(300)
 
 # Mach values for the clumpy case
-mach_vals = np.array([10, 30, 100, 300])
+mach_vals = np.array([10, 30, 50, 100])
 
 # Build colormap for Mach curves (shared by left & right panels)
 def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=10):
@@ -222,11 +257,13 @@ def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=10):
 cmap = truncate_colormap(plt.cm.coolwarm_r, 0., 1.)
 mach_norm = (np.log10(mach_vals) - np.log10(mach_vals.min())) / \
             (np.log10(mach_vals.max()) - np.log10(mach_vals.min()))
-mach_colors = [cmap(v) for v in mach_norm]   # [color(M=10), color(30), color(100), color(300)]
+mach_colors = [cmap(v) for v in mach_norm]   # [color(M=10), color(30), color(50), color(100)]
 
-# -----------------------------
-# 2) Two-panel figure: Σ_d PDFs (left) + MUV PDFs (right)
-# -----------------------------
+# ============================================================
+# FIGURE 1: Two-panel — Sigma_d PDFs (left) + MUV PDFs (right)
+# Left: galaxy-to-galaxy scatter (uniform) vs LOS scatter (M=10,100)
+# Right: resulting MUV distributions at multiple Mach numbers
+# ============================================================
 fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
 # ---- LEFT PANEL: Σ_d PDFs in log10-space (KDEs) ----
@@ -237,25 +274,25 @@ gcm2_to_Msun_kpc2 = (kpc_to_cm**2) / Msun
 # convert Σ_d samples to Msun/kpc^2 and take log10
 logSig_spin = np.log10(Sigmad_arr * gcm2_to_Msun_kpc2)
 logSig_10   = np.log10(Sigmad_distr_10 * gcm2_to_Msun_kpc2)
-logSig_300  = np.log10(Sigmad_distr_300 * gcm2_to_Msun_kpc2)
+logSig_100  = np.log10(Sigmad_distr_100 * gcm2_to_Msun_kpc2)
 
-logs_list = [logSig_spin, logSig_10, logSig_300]
+logs_list = [logSig_spin, logSig_10, logSig_100]
 
 # common x-grid in log10(Σ_d / Msun kpc^-2)
 x_Sig_min = min(l.min() for l in logs_list)
 x_Sig_max = max(l.max() for l in logs_list)
 x_Sig = np.linspace(x_Sig_min, x_Sig_max, 400)
 
-# colors & labels (left panel); use Mach colormap for 10 and 300
+# colors & labels (left panel); use Mach colormap for 10 and 100
 colors_Sigma = [
     'dimgrey',        # uniform / spin-driven
     mach_colors[0],   # M=10
-    mach_colors[-1]   # M=300
+    mach_colors[-1]   # M=100
 ]
 labels_Sigma = [
     'Galaxy-to-Galaxy scatter\n (Size driven)',
     'Single galaxy, LOS scatter\n (Turbulence-driven, $\\mathcal{M}=10$)',
-    '(Turbulence-driven, $\\mathcal{M}=300$)'
+    '(Turbulence-driven, $\\mathcal{M}=100$)'
 ]
 
 for i, (logs, col, lab) in enumerate(zip(logs_list, colors_Sigma, labels_Sigma)):
@@ -289,20 +326,20 @@ MUV_list = [
     MUV_spin,          # uniform, galaxy-to-galaxy
     MUV_clumpy_10,     # LOS-to-LOS
     MUV_clumpy_30,
-    MUV_clumpy_100,
-    MUV_clumpy_300
+    MUV_clumpy_50,
+    MUV_clumpy_100
 ]
 
 # Colors & labels for right panel:
 #   - first: uniform
-#   - then: 10, 30, 100, 300 with colormap colors
+#   - then: 10, 30, 50, 100 with colormap colors
 colors_MUV = ['dimgrey'] + mach_colors
 labels_MUV = [
     'Galaxy-to-Galaxy scatter',
     r'Single galaxy, LOS scatter'+'\n'+r'$\mathcal{M}=10$',
     r'$\mathcal{M}=30$',
-    r'$\mathcal{M}=100$',
-    r'$\mathcal{M}=300$'
+    r'$\mathcal{M}=50$',
+    r'$\mathcal{M}=100$'
 ]
 
 # Build x-grid for MUV PDFs
@@ -345,9 +382,15 @@ plt.show()
 
 
 
-# ============================
-# IR SEDs for (kUV_drn, kUV_hir) × (Mach=10, 300)
-# ============================
+# ============================================================
+#  SECTION 5: Far-IR SED comparison
+# ============================================================
+# For each dust model (MW WD01, stellar H19) and each Mach number,
+# compute the absorbed UV luminosity -> L_IR, then invert the
+# single-T greybody to get T_dust, and plot the observed-frame SED.
+# Key physics: L_IR = L_UV,intr * f_abs, where f_abs is the
+# seed-averaged absorbed fraction from the turbulent Sigma_d PDF.
+# ============================================================
 
 def seedavg_LIR_from(kUV_here_abs, Mach_here, Sigmad_arr, Lintr, K_SPINS=13, K_U=24):
     """
@@ -380,7 +423,7 @@ def seedavg_LIR_from(kUV_here_abs, Mach_here, Sigmad_arr, Lintr, K_SPINS=13, K_U
     # nodes in Σ_d for each seed, then absorption
     x_nodes = np.exp(np.log(mu_sigmas)[:, None] + sig_ln * z_nodes[None, :])  # (K_SPINS, K_U)
     tau_abs_nodes = kUV_here_abs * x_nodes
-    T_abs_nodes   = T_1500_sphere_im(tau_abs_nodes)
+    T_abs_nodes   = T_sphere_mixed(tau_abs_nodes)
     A_nodes       = 1.0 - T_abs_nodes   # absorbed fraction at 1500 Å
 
     # average over quadrature nodes per seed, then over seeds
@@ -400,7 +443,9 @@ def freq_convert(lamda_micron):
 
 def T_CMB_corr(Td, redshift):
     """
-    Corrects dust temperature Td for the effect of the CMB acting as a thermal bath at a given redshift (matters at high-z).
+    Corrects dust temperature Td for the CMB thermal bath at high z.
+    At z~7 the CMB is ~22 K, which sets a floor on T_dust and reduces
+    the contrast against the CMB background (da Cunha+13).
     """
     return (Td**(4+bd) + (To**(4+bd)) * ((1.0 + redshift)**(4+bd) - 1.0))**(1.0 / (4.0 + bd))
 
@@ -411,7 +456,13 @@ if "compute_Td_single" not in globals():
           - logMdust [log10 Msun]
           - betad    [emissivity index]
           - logLdust [log10 Lsun]  (bolometric IR luminosity)
-        using κ_ν anchored at 158 μm.
+        using kappa_nu anchored at 158 um.
+
+        NB: the exponents kb^(4+beta) / h^(3+beta) come from the
+        modified Planck integral: L = Md * kappa_0 * (8*pi/c^2) *
+        (nu_0^-beta) * (kb/h)^(4+beta) * Gamma(4+beta) * zeta(4+beta) * Td^(4+beta).
+        The asymmetry (4+beta vs 3+beta) arises because one power of h
+        is absorbed into the 2h/c^2 prefactor of B_nu.
         """
         Teta = ((np.pi * 8.0 / c**2) *
                 (kabs_158 / freq_convert(158.)**betad) *
@@ -487,8 +538,8 @@ dust_models = [
 ]
 
 
-Mach_list = [10, 300]
-linestyle_map = {10: "-", 300: "--"}
+Mach_list = [10, 100]
+linestyle_map = {10: "-", 100: "--"}
 
 # wavelength grids (observed) and rest-frame conversion
 lambda_obs  = np.logspace(2, 4, 2000)         # micron (obs)
@@ -503,7 +554,7 @@ for model in dust_models:
     kUV_abs_model  = model["kUV_abs"]   # κ_1500,abs for this model
     kappa_158_model = model["kIR_158"]  # κ_158 for this model
 
-    for Mnum in [10, 300]:
+    for Mnum in [10, 100]:
         # L_IR from clumpy ISM with the *correct* UV opacity
         LIR_case = seedavg_LIR_from(kUV_abs_model, Mnum, Sigmad_arr, Lintr,
                                     K_SPINS=13, K_U=24)
@@ -522,6 +573,7 @@ for model in dust_models:
                  label=f"{label}, $\\mathcal{{M}}$={Mnum} ($T_d$={Td_case:.1f} K)",
                  alpha=0.7)
 
+
 # --- REBELS data points overplotted ---
 ## colormap (same as tau_v plot for consistency)
 custom_colormap_base = cm.coolwarm
@@ -530,7 +582,7 @@ custom_colormap = truncate_colormap(custom_colormap_base, 0.1, 1.)
 # REBELS data
 if redshift == 7:
     for jj in range(len(REBELS_index)):
-        plt.errorbar(np.log10(158*reds_REB[jj]), np.log10(IR_Flux_meas[jj]), yerr=[[np.log10(IR_Flux_meas[jj] + err_IR_Flux_meas[jj]) - np.log10(IR_Flux_meas[jj])], [-np.log10(IR_Flux_meas[jj] - err_IR_Flux_meas[jj]) + np.log10(IR_Flux_meas[jj])]], ms=10.,marker='s',capsize=2.5,mec='black',elinewidth=0.5,alpha=0.8, color=custom_colormap((logMstar_REB_npSFH[jj] -6.2)/4.2), mew=0.3)
+        plt.errorbar(np.log10(158*reds_REB[jj]), np.log10(IR_Flux_REB[jj]), yerr=[[np.log10(IR_Flux_REB[jj] + err_IR_Flux_REB[jj]) - np.log10(IR_Flux_REB[jj])], [-np.log10(IR_Flux_REB[jj] - err_IR_Flux_REB[jj]) + np.log10(IR_Flux_REB[jj])]], ms=10.,marker='s',capsize=2.5,mec='black',elinewidth=0.5,alpha=0.8, color=custom_colormap((logMstar_REB_npSFH[jj] -6.2)/4.2), mew=0.3)
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -564,6 +616,5 @@ plt.ylabel(r'$\log\,(F_{\nu}/{\rm \mu Jy})$')
 plt.legend(frameon=False, fontsize=11, ncol=1, loc='upper left')
 plt.tight_layout()
 plt.show()
-
 
 

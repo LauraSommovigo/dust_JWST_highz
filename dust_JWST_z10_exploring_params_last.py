@@ -1,4 +1,20 @@
-from statistics import median
+# ============================================================
+# dust_JWST_z10_exploring_params_last.py
+# ============================================================
+# Explores the SAM predictions for "characteristic" halos at a
+# chosen redshift. For each halo mass in Mh_array:
+#   - Builds the star-formation history (SFH) from halo accretion
+#   - Tracks dust mass build-up from SN yields
+#   - Computes tau_V, L_UV (intrinsic and attenuated)
+# Produces diagnostic plots:
+#   1) SFR vs Mh (GUREFT vs Sommovigo+22 accretion rates)
+#   2) 4-panel: SFH, Mstar, Mdust, Md/Mstar evolution
+#   3) tau_V build-up with observed JWST/REBELS points
+#   4) MUV-Mstar relation (intrinsic)
+#   5) Kennicutt vs SB99 L1500 comparison
+#   6) MUV-Mstar with dust attenuation (two geometries)
+#   7) Galaxy half-light radius rd vs Mstar
+# ============================================================
 from highz_gal_SAM import *
 from matplotlib.colors import ListedColormap
 from general import name_and_save, increase_ticklabels, set_labels, do_minorticks, do_log, equal_axes, \
@@ -6,21 +22,12 @@ from general import name_and_save, increase_ticklabels, set_labels, do_minortick
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 
-
-###########################
-##### MY FUNCTIONS
-###########################
+# ---- Utility functions ----
 
 def find_nearest(array, value):
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
     return idx
-
-# numerical density cgs, from Sommovigo+20, for  auniform spherical cloud
-def num_dens_cgs(p=0.0, sigma=1e-10):
-        mu=1.22
-        n=p/(mp*mu*sigma**2)#gcm^-3
-        return n
 
 ## colormap
 custom_colormap_base = cm.coolwarm
@@ -29,52 +36,50 @@ def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=10):
     return new_cmap
 custom_colormap = truncate_colormap(custom_colormap_base, 0.1, 1.)
 
-### Loading Sn rate from SB99 for instantaneous SFR, and Metallicity=0.001 (1/10 Zsun), Salpeter IMF 1-100 Msun
+# ---- Load Starburst99 (SB99) tables ----
+# Instantaneous burst with Z=0.001 (1/10 Zsun), Salpeter IMF (1-100 Msun).
+# These are convolved with the SFH to get time-dependent SN rate,
+# ionising photon rate, and UV luminosity.
 metall=0.001/Zsun
-logSNr_yr=np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/snr_inst_Z001.txt',usecols=1)
-time_yr=np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/snr_inst_Z001.txt',usecols=0)
+logSNr_yr=np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99', 'snr_inst_Z001.txt'), usecols=1)
+time_yr=np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99', 'snr_inst_Z001.txt'), usecols=0)
 
 ## Loading Ionizing photon rate  from SB99 for instantaneous SFR, and Metallicity=0.001 (1/10 Zsun), Salpeter IMF 1-100 Msun
-log_dotNion=np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/Ni_inst_Z001.txt',usecols=1)
-time_yr_Nion=np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/Ni_inst_Z001.txt',usecols=0)
+log_dotNion=np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99', 'Ni_inst_Z001.txt'), usecols=1)
+time_yr_Nion=np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99', 'Ni_inst_Z001.txt'), usecols=0)
 
 ## logL1500, same assumptions as before [erg/s/angstrom] units
-L1500_SB99=np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/L1500_inst_Z001.txt',usecols=1)
-time_yr_L1500=np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/L1500_inst_Z001.txt',usecols=0)
+L1500_SB99=np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99', 'L1500_inst_Z001.txt'), usecols=1)
+time_yr_L1500=np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99', 'L1500_inst_Z001.txt'), usecols=0)
 
-L1500_SB99_cont=np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/L1500_cont_Z001.txt',usecols=1)
-time_yr_L1500_cont=np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/L1500_cont_Z001.txt',usecols=0)
+L1500_SB99_cont=np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99', 'L1500_cont_Z001.txt'), usecols=1)
+time_yr_L1500_cont=np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99', 'L1500_cont_Z001.txt'), usecols=0)
 ###########################
 ###########################
 
 
 
-### Choosing redshift, and Mh range
-redshift=7#7#10.
-Mh_array=np.logspace(8,12,8)##NB: important to use the same mass rnge used for the fitting in Yung+23, 8 in plot version
+# ============================================================
+#  MODEL PARAMETERS
+# ============================================================
+redshift=10#7#10.
+Mh_array=np.logspace(8,12,8)  # same mass range as Yung+23 fitting
 fb=cosmo.Ob(redshift)/cosmo.Om(redshift)
 print('\n\nfb at z=0 -->', cosmo.Ob(0)/cosmo.Om(0), ', vs z=10 -->', fb)
 print('rvir at z=10 for Mh=10^10.6/(0.1*fb) -->', r_vir(0 , (10**10.6)/(0.1*fb) ))
  
-### Fixing SF efficiency
-epsilon=0.1#0.1#1#0.5
-
-###Fixing the dust yiled per each Sn event, based on Bocchio+16 discussion on SN 1987A
-yd=1e-1#NB: /sim 2 orders of magnitude below rebels inferred value
-
-###Choosing the attenuation curve (_drn or_hir)
-kUV=kUV_drn
-kv=kv_drn
-
-###Fixing spin parameter
-spin_param=0.027
-
-# Fixing tstep for SFH, NB: deve essere breve abbastanza affinche' SN rate interpolato bene, 1-2 Myr vanno bene
-tstep=1#in [Myr] units
+epsilon=0.1           # star-formation efficiency: Mstar = epsilon * fb * Mh
+yd=1e-1               # dust yield per SN event [Msun/SN] (Bocchio+16, SN 1987A)
+kUV=kUV_drn           # UV opacity [cm^2/g]: choose _drn (MW) or _hir (stellar)
+kv=kv_drn             # V-band opacity [cm^2/g]
+spin_param=0.027      # halo spin parameter lambda (median of lognormal)
+tstep=1               # SFH timestep [Myr]; must resolve SN rate (1-2 Myr is fine)
 
 
 
-### Computing Stellar properties at the given z
+# ============================================================
+#  DERIVED QUANTITIES
+# ============================================================
 Mstar_array=halo_to_stellar_mass(Mh_array, fb, epsilon)# Stellar masses corresponding to Mh_array at z=10, in [Msun] units
 Mstar_array_05=halo_to_stellar_mass(Mh_array, fb, 0.5)# Stellar masses corresponding to Mh_array at z=10, in [Msun] units
 Mstar_array_01=halo_to_stellar_mass(Mh_array, fb, 0.1)# Stellar masses corresponding to Mh_array at z=10, in [Msun] units
@@ -90,9 +95,10 @@ print('#########################################')
 print('\n')
 
 
-#------------------------------------------------------------------------------------------
-### Plot instantaeous SFR for given M_halo and M_star at z=10: GUREFT vs. Sommovigo+22
-#------------------------------------------------------------------------------------------
+# ============================================================
+#  FIGURE 1: Instantaneous SFR vs M_halo
+#  Compares GUREFT (Yung+23) and Sommovigo+22 halo accretion rates
+# ============================================================
 fig = plt.figure()
 ax1 = fig.add_subplot(111)
 
@@ -117,10 +123,14 @@ plt.tight_layout()
 plt.show()
 
 
-
-### Building SFH and dust build up from SN for each halo mass
-### Distr. of spin. param from GUREFT, Yung+23
-spin_param_distr=random.lognormal(mean=-3.6,sigma=0.5677,size=1000)#Yung+23 says mu=-1.5677 (?)
+# ============================================================
+#  FIGURE 2: 4-panel — SFH, Mstar, Mdust, Md/Mstar build-up
+#  For each halo mass, convolve SB99 SSP tables with the SFH to
+#  get time-dependent L1500, SN rate, and dust mass.
+#  Also saves Properties_*.txt files used by later scripts.
+# ============================================================
+# Spin parameter distribution from GUREFT (Yung+23): lognormal
+spin_param_distr=np.random.lognormal(mean=-3.6,sigma=0.5677,size=1000)#Yung+23 says mu=-1.5677 (?)
 #print('16-84th percentile spin parameter distribution', np.percentile(spin_param_distr,16), np.percentile(spin_param_distr,84))
 #plt.hist(spin_param_distr,bins=20)
 #plt.show()
@@ -139,8 +149,6 @@ plt.subplots_adjust(
     wspace=0.2,
     hspace=0.0
 )
-
-j = 0
 
 ## transition to opt. thick at: age_ott
 age_ott = []
@@ -196,7 +204,9 @@ for j in range(len(Mh_array)):
     ax_ratio.plot(age, ratio, lw=2., ls='-.', alpha=0.8, color=col,
                   label=r'$\log (M_{\rm d}/M_\star)$' if j == 0 else None)
     
-    # --- tau_V and optically thick transition (unchanged logic) ---
+    # --- tau_V and optically thick transition ---
+    # NB: tau is inversely proportional to spin (small spin -> compact -> high tau)
+    # so the 16th percentile of spin gives tauV_max, and 84th gives tauV_min.
     tauV     = tau_pred(kv, Md_arr, Mh_array[j], spin_param_distr.mean(), redshift)
     tauV_max = tau_pred(kv, Md_arr, Mh_array[j], np.percentile(spin_param_distr,16), redshift)
     tauV_min = tau_pred(kv, Md_arr, Mh_array[j], np.percentile(spin_param_distr,84), redshift)
@@ -218,10 +228,10 @@ for j in range(len(Mh_array)):
     
     # --- Save outputs as before ---
     np.savetxt(
-        '/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/Properties_10logMH'
+        os.path.join(SCRIPTS_DIR, 'txt_files', 'Outputs', 'Properties_10logMH'
         + str(int(10*np.log10(Mh_array[j]))) + '_1e3yd' + str(int(1e3*yd))
         + '_100eps' + str(int(100*epsilon)) + '_1e3lam' + str(int(1e3*spin_param))
-        + '_NoEjection_red' + str(int(redshift)) + '.txt',
+        + '_NoEjection_red' + str(int(redshift)) + '.txt'),
         np.c_[age, SFH, logMst_build, logMd, tauV, tauV_min, tauV_max, L1500_arr],
         header='log(Mhalo/Msun)='+str(round(np.log10(Mh_array[j]),3))
                + '\n yd='+str(yd)+', e_star='+str(epsilon)
@@ -291,7 +301,7 @@ cbaxis.tick_params(axis='both', which='major', pad=4)
 cbaxis.set_yticks([])
 
 fig.savefig(
-    "/Users/lsommovigo/Desktop/multipanel_SFH_plot.png",
+    "/Users/laurasommovigo/Desktop/multipanel_SFH_plot.png",
     dpi=200
 )
 
@@ -302,10 +312,11 @@ plt.close()
 
 
 
-#------------------------------------------------------------------------------------------
-##### Separate plot for tau_V build up for the different halo masses
-#------------------------------------------------------------------------------------------
-j=0
+# ============================================================
+#  FIGURE 3: tau_V build-up vs galaxy age for each halo mass
+#  Overplots JWST (z>=10) or REBELS (z=7) observed data points.
+#  Shaded band on j=5 halo shows spin-parameter scatter in rd.
+# ============================================================
 fig = plt.figure()
 ax1 = fig.add_subplot(111)
 
@@ -313,13 +324,18 @@ for j in range(len(Mh_array)):
     col=custom_colormap(float(j)/len(Mh_array))
     print('\n log(Mh/Msol)=', np.log10(Mh_array[j]))
     print('log(Mstar/Msol)=', np.log10(Mstar_array[j]))
-    print('log(Md/Msol)=',np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/Properties_10logMH'+str(int(10*np.log10(Mh_array[j])))+'_1e3yd'+str(int(1e3*yd))+'_100eps'+str(int(100*epsilon))+ '_1e3lam'+str(int(1e3*spin_param))+'_NoEjection_red'+str(int(redshift))+'.txt', usecols=3)[-1])
-    print( 'rd/kpc -->', rd_kpc(redshift,Mh_array[j],spin_param_distr.mean()), '-',  rd_kpc(redshift,Mh_array[j],spin_param_distr.mean()) - rd_kpc(redshift,Mh_array[j],np.percentile(spin_param_distr,16)), '+', -rd_kpc(redshift,Mh_array[j],spin_param_distr.mean()) + rd_kpc(redshift,Mh_array[j],np.percentile(spin_param_distr,84)))  
+    _props_path = os.path.join(SCRIPTS_DIR, 'txt_files', 'Outputs',
+        'Properties_10logMH' + str(int(10*np.log10(Mh_array[j])))
+        + '_1e3yd' + str(int(1e3*yd)) + '_100eps' + str(int(100*epsilon))
+        + '_1e3lam' + str(int(1e3*spin_param))
+        + '_NoEjection_red' + str(int(redshift)) + '.txt')
+    print('log(Md/Msol)=', np.loadtxt(_props_path, usecols=3)[-1])
+    print( 'rd/kpc -->', rd_kpc(redshift,Mh_array[j],spin_param_distr.mean()), '-',  rd_kpc(redshift,Mh_array[j],spin_param_distr.mean()) - rd_kpc(redshift,Mh_array[j],np.percentile(spin_param_distr,16)), '+', -rd_kpc(redshift,Mh_array[j],spin_param_distr.mean()) + rd_kpc(redshift,Mh_array[j],np.percentile(spin_param_distr,84)))
     ## Importo info necessarie dalla computazione precedente
-    time_arr= np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/Properties_10logMH'+str(int(10*np.log10(Mh_array[j])))+'_1e3yd'+str(int(1e3*yd))+'_100eps'+str(int(100*epsilon))+ '_1e3lam'+str(int(1e3*spin_param))+'_NoEjection_red'+str(int(redshift))+'.txt', usecols=0)
-    tauV_arr= np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/Properties_10logMH'+str(int(10*np.log10(Mh_array[j])))+'_1e3yd'+str(int(1e3*yd))+'_100eps'+str(int(100*epsilon))+ '_1e3lam'+str(int(1e3*spin_param))+'_NoEjection_red'+str(int(redshift))+'.txt', usecols=4)
-    tauV_min_arr= np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/Properties_10logMH'+str(int(10*np.log10(Mh_array[j])))+'_1e3yd'+str(int(1e3*yd))+'_100eps'+str(int(100*epsilon))+ '_1e3lam'+str(int(1e3*spin_param))+'_NoEjection_red'+str(int(redshift))+'.txt', usecols=5)
-    tauV_max_arr= np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/Properties_10logMH'+str(int(10*np.log10(Mh_array[j])))+'_1e3yd'+str(int(1e3*yd))+'_100eps'+str(int(100*epsilon))+ '_1e3lam'+str(int(1e3*spin_param))+'_NoEjection_red'+str(int(redshift))+'.txt', usecols=6)
+    time_arr= np.loadtxt(_props_path, usecols=0)
+    tauV_arr= np.loadtxt(_props_path, usecols=4)
+    tauV_min_arr= np.loadtxt(_props_path, usecols=5)
+    tauV_max_arr= np.loadtxt(_props_path, usecols=6)
     ##
     lw=1.
     
@@ -389,23 +405,21 @@ plt.show()
 
 
 
-#------------------------------------------------------------------------------------------
-### MUV vs. M_Star plot (intrinsic)
-#------------------------------------------------------------------------------------------
-j=0
+# ============================================================
+#  FIGURE 4: Intrinsic MUV vs Mstar (no dust attenuation)
+#  Reads the saved Properties files to get final-epoch L1500.
+# ============================================================
 LUV_z10=[]
-LUV_z10_05=[]
-LUV_z10_01=[]
 for j in range(len(Mh_array)):
-    #L1500_z10= np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/Properties_10logMH'+str(int(10*np.log10(Mh_array[j])))+'_1e3yd'+str(int(1e3*yd))+'_100eps'+str(int(100*epsilon))+ '_1e3lam'+str(int(1e3*spin_param))+'_NoEjection.txt', usecols=7)[-1]
-    
-    LUV_z10=np.append(LUV_z10,np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/Properties_10logMH'+str(int(10*np.log10(Mh_array[j])))+'_1e3yd'+str(int(1e3*yd))+'_100eps'+str(int(100*epsilon))+ '_1e3lam'+str(int(1e3*spin_param))+'_NoEjection_red'+str(int(redshift))+'.txt', usecols=7)[-1])
-    
-    #LUV_z10_05=np.append(LUV_z10_05,np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/Properties_10logMH'+str(int(10*np.log10(Mh_array[j])))+'_1e3yd'+str(int(1e3*yd))+'_100eps'+str(int(100*0.5))+ '_1e3lam'+str(int(1e3*spin_param))+'_NoEjection.txt', usecols=7)[-1])
-    
-    #LUV_z10_01=np.append(LUV_z10_01,np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/Properties_10logMH'+str(int(10*np.log10(Mh_array[j])))+'_1e3yd'+str(int(1e3*yd))+'_100eps'+str(int(100*0.1))+ '_1e3lam'+str(int(1e3*spin_param))+'_NoEjection.txt', usecols=7)[-1])
-    
-    print('LUV [erg/s/Angstrom] -->', np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/Properties_10logMH'+str(int(10*np.log10(Mh_array[j])))+'_1e3yd'+str(int(1e3*yd))+'_100eps'+str(int(100*epsilon))+ '_1e3lam'+str(int(1e3*spin_param))+'_NoEjection_red'+str(int(redshift))+'.txt', usecols=7)[-1])
+    _props_dir = os.path.join(SCRIPTS_DIR, 'txt_files', 'Outputs')
+    _props_base = ('Properties_10logMH' + str(int(10*np.log10(Mh_array[j])))
+        + '_1e3yd' + str(int(1e3*yd)) + '_100eps' + str(int(100*epsilon))
+        + '_1e3lam' + str(int(1e3*spin_param)))
+    _props_path = os.path.join(_props_dir, _props_base + '_NoEjection_red' + str(int(redshift)) + '.txt')
+
+    LUV_z10=np.append(LUV_z10, np.loadtxt(_props_path, usecols=7)[-1])
+
+    print('LUV [erg/s/Angstrom] -->', np.loadtxt(_props_path, usecols=7)[-1])
 
 if redshift>=10:
     for jj in range(len(names)):
@@ -438,9 +452,12 @@ print('[logMstar, MUV] for epsilon=',str(epsilon),'-->', str(np.log10(Mstar_arra
 
 
 
-#------------------------------------------------------------------------------------------
-### Study difference in L1500 from Kennicutt vs SB99 rescaled
-#------------------------------------------------------------------------------------------
+# ============================================================
+#  FIGURE 5: L1500 — Kennicutt relation vs SB99 convolution
+#  Shows that the Kennicutt (1998) L_UV-SFR calibration is only
+#  valid at late times (>100 Myr) when the SFH reaches steady state.
+#  At early times the SB99 SSP convolution gives different results.
+# ============================================================
 SFH, logMst_build, age =Build_SFH_funct(Mh_array[3],10.,1,0.1)
 #print('SFH-->', SFH)
 Lnu_SB99_arr=[]
@@ -482,9 +499,9 @@ plt.show()
 
 
 
-## Showing the effect of adding the transmission function
-plt.plot(np.linspace(1e-3,5,1000),T_1500_sphere(np.linspace(1e-3,5,1000)), label='our funct. $T_{\lambda}$')
-plt.plot(np.linspace(1e-3,5,1000),T_1500_sphere_im(np.linspace(1e-3,5,1000)), label='our funct., mixed, $T_{\lambda}$')
+# --- Quick plot: transmission functions T(tau) for the two geometries ---
+plt.plot(np.linspace(1e-3,5,1000),T_sphere_central(np.linspace(1e-3,5,1000), omega_1500_drn, g_1500_drn), label='our funct. $T_{\lambda}$')
+plt.plot(np.linspace(1e-3,5,1000),T_sphere_mixed(np.linspace(1e-3,5,1000)), label='our funct., mixed, $T_{\lambda}$')
 plt.plot(np.linspace(1e-3,5,1000),np.exp(-np.linspace(1e-3,5,1000)),ls='--',color='grey',alpha=0.5, label=r"screen, $e^{-\tau}$")
 plt.ylabel(r'$T_{1500}(\tau_{1500})$')
 plt.xlabel(r'$\tau_{1500}$')
@@ -497,9 +514,13 @@ plt.show()
 
 
 
-#------------------------------------------------------------------------------------------
-### MUV–Mstar plot accounting for dust attenuation: two transmission functions
-#------------------------------------------------------------------------------------------
+# ============================================================
+#  FIGURE 6: MUV-Mstar with dust attenuation
+#  Loops over (epsilon, yd) combinations. For each halo:
+#    - Draws 1000 spin parameters -> spread in tau_UV -> spread in MUV
+#    - Two geometries: mixed (sphere_mixed) and point-source (sphere_central)
+#  Shaded bands show 16th-84th percentile from spin scatter.
+# ============================================================
 arr_e  = np.array([0.1])            # You can add more values if needed
 arr_yd = np.array([0.001, 0.01, 0.1])
 plt.figure(figsize=(9, 7))
@@ -508,16 +529,9 @@ plt.figure(figsize=(9, 7))
 point_colormap = custom_colormap  
 line_colormap  = cm.inferno
 
-def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=10):
-    new_cmap = colors.LinearSegmentedColormap.from_list(
-        'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
-        cmap(np.linspace(minval, maxval, n))
-    )
-    return new_cmap
+line_colormap = truncate_colormap(line_colormap, 0., 0.7)  # reuse truncate_colormap from top
 
-line_colormap = truncate_colormap(line_colormap, 0., 0.7)
-
-for epsilon in arr_e:
+for eps in arr_e:
     for yd in arr_yd:
         # linestyle encodes dust yield
         if yd == 0.1:
@@ -527,8 +541,8 @@ for epsilon in arr_e:
         elif yd == 0.01:
             ls = '--'
 
-        Mstar_array = halo_to_stellar_mass(Mh_array, fb, epsilon)
-        spin_param_distr = random.lognormal(mean=np.log(10**-1.5677),
+        Mstar_array = halo_to_stellar_mass(Mh_array, fb, eps)
+        spin_param_distr = np.random.lognormal(mean=np.log(10**-1.5677),
                                             sigma=0.5390, size=1000)
 
         # arrays for intrinsic & attenuated magnitudes
@@ -545,7 +559,7 @@ for epsilon in arr_e:
         MUVatt_ps_l     = []
 
         for j in range(len(Mh_array)):
-            SFH, logMst_build, age = Build_SFH_funct(Mh_array[j], redshift, tstep, epsilon)
+            SFH, logMst_build, age = Build_SFH_funct(Mh_array[j], redshift, tstep, eps)
             L1500_arr = compute_L1500_steps(age, tstep, SFH, time_yr_L1500, L1500_SB99)
             N_SN_arr, Md_arr = compute_Mdust_steps(age, tstep, SFH, time_yr, logSNr_yr, yd)
 
@@ -553,7 +567,7 @@ for epsilon in arr_e:
             tauUV = tau_pred(kUV, Md_arr[-1], Mh_array[j], spin_param_distr, redshift)
 
             # mixed geometry transmission
-            T1500_mix = T_1500_sphere_im(tauUV)
+            T1500_mix = T_sphere_mixed(tauUV)
             LUV_mix_arr = np.atleast_1d(np.asarray(T1500_mix) * L1500_arr[-1])
             MUV_mix_dist = L1500_to_MUV_conv(LUV_mix_arr)
             MUV_mix  = np.median(MUV_mix_dist)
@@ -561,7 +575,7 @@ for epsilon in arr_e:
             MUV_mix_l = np.percentile(MUV_mix_dist, 84)
 
             # point–source transmission
-            T1500_ps = T_1500_sphere(tauUV)
+            T1500_ps = T_sphere_central(tauUV, omega_1500_drn, g_1500_drn)
             LUV_ps_arr = np.atleast_1d(np.asarray(T1500_ps) * L1500_arr[-1])
             MUV_ps_dist = L1500_to_MUV_conv(LUV_ps_arr)
             MUV_ps  = np.median(MUV_ps_dist)
@@ -582,11 +596,11 @@ for epsilon in arr_e:
             MUVatt_ps_l.append(MUV_ps_l)
 
         # --- Plotting lines with inferno colormap based on epsilon ---
-        line_color = line_colormap(np.clip(epsilon + epsilon / 0.05 / 10, 0, 1))
+        line_color = line_colormap(np.clip(eps + eps / 0.05 / 10, 0, 1))
 
         # mixed geometry (solid color)
         plt.plot(np.log10(Mstar_array), MUVatt_mix, ls=ls, lw=1.5,
-                 label=fr"Attenuated (mix): $\epsilon={epsilon}$, $y_d={yd}$",
+                 label=fr"Attenuated (mix): $\epsilon={eps}$, $y_d={yd}$",
                  color=line_color, alpha=0.7)
 
         if yd == arr_yd[-1]:
@@ -653,7 +667,9 @@ plt.show()
 
 
 
-# --- figure (not in the paper) ---
+# ============================================================
+#  FIGURE 7: Galaxy half-light radius rd vs Mstar (not in paper)
+# ============================================================
 fig, ax = plt.subplots(figsize=(10,6))
 # --- compute rd arrays ---
 rd_arr, rd_arr_low, rd_arr_up = [], [], []

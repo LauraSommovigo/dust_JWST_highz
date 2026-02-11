@@ -751,7 +751,7 @@ def print_confidence_interval(median, error, dec=2, text=None, delimiter='\n'):
 
 
 def name_and_save(plotfile, **kwargs):
-	plt.savefig(plotfile, dpi=kwargs.get('dpi',None), \
+	plt.savefig(plotfile, dpi=kwargs.get('dpi', 600), \
 						  facecolor=kwargs.get('facecolor', 'white'), \
 						  transparent=kwargs.get('transparent', False))
 	print("Saved figure", plotfile)	

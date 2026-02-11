@@ -1,3 +1,25 @@
+# ============================================================
+# dust_JWST_z10_population_LF_draw_sample_uniform.py
+# ============================================================
+# Computes the UV and IR luminosity functions (LFs) for a
+# population of halos at a given redshift, assuming a UNIFORM
+# dust shell (no turbulent clumpiness).
+#
+# Method:
+#   For each halo mass Mh on a grid:
+#     1) Build SFH -> get final L1500 and Md (at yd=1, then scale)
+#     2) Draw K_SPINS stratified spin parameters -> tau_UV -> T(tau)
+#     3) Blend median and mean T to get T_eff (knob W_BLEND)
+#     4) MUV_att = -2.5 log10(T_eff * L1500) + 51.63
+#   The UV LF is then phi(MUV) = (dn/dlogMh) / |dMUV/dlogMh|
+#   (Jacobian transformation of the halo mass function).
+#   The IR LF uses L_IR = (1-T_abs) * L1500 * nu_1500.
+#
+# Outputs:
+#   1) UV luminosity function for multiple (epsilon, yd) pairs
+#   2) IR luminosity function (same parameter grid)
+# ============================================================
+
 from highz_gal_SAM import *
 from general import name_and_save, increase_ticklabels, set_labels, do_minorticks, do_log, equal_axes, \
     set_colorbar_labels, set_ticklabels
@@ -5,18 +27,23 @@ from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
 import matplotlib.gridspec as gridspec
 from scipy.stats import norm  # for inverse CDF of normal (lognormal quantiles)
-from scipy.signal import savgol_filter# for smoothing LF
+from scipy.signal import savgol_filter  # for smoothing LF
 from scipy.ndimage import median_filter
 from matplotlib.lines import Line2D
 
-##---- extra functions needed:
+# ============================================================
+#  HELPER FUNCTIONS
+# ============================================================
 def redistribute_phi(MUV_array, phi_array):
+    """
+    Fix non-monotonic MUV(Mh) curves caused by dust attenuation
+    making massive halos fainter than expected.
+    When MUV turns around (starts getting fainter at higher Mh),
+    redistribute the phi from the non-monotonic tail back into
+    the nearest earlier bin with similar MUV.
+    """
     MUV_array = np.array(MUV_array)
     phi_array = np.array(phi_array)
-
-    #print("\n--- ENTERING redistribute_phi ---")
-    #print("MUV input:", MUV_array)
-    #print("phi input:", phi_array)
 
     # Detect where MUV stops getting brighter and starts getting fainter
     diffs = np.diff(MUV_array)
@@ -74,7 +101,7 @@ def mask_by_slope(x_curve, phi_curve, slope_floor=SLOPE_FLOOR, hard_cap=None):
 
 
 
-##---- colormap
+# ---- colormap ----
 costum_colormap = cm.inferno
 def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=10):
     new_cmap = colors.LinearSegmentedColormap.from_list('trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval), cmap(np.linspace(minval, maxval, n)))
@@ -86,14 +113,15 @@ costum_colormap = truncate_colormap(costum_colormap, 0., 0.7)
 
 
 
-### Choosing redshift, Mh range, dust model
-redshift=10.#7.#10.
+# ============================================================
+#  MODEL PARAMETERS
+# ============================================================
+redshift=7.           # target redshift (7 or 10)
 fb=cosmo.Ob(redshift)/cosmo.Om(redshift)
-lumDistpc = cosmo.luminosity_distance(redshift)*(1e6)#pc
-lumDistpc = lumDistpc.value
-logMh_array=np.linspace(8,13,20)##NB: important to use the same mass range used for the fitting in Yung+23
+lumDistpc = cosmo.luminosity_distance(redshift).value * 1e6  # luminosity distance [pc]
+logMh_array=np.linspace(8,13,23)  # halo mass grid [log10 Msun]; same range as Yung+23
 
-## Plot HMF
+# ---- Quick HMF comparison plot ----
 plt.plot(logMh_array, dn_dlogMh_GUREFT(logMh_array,redshift),alpha=0.5,zorder=-10, label='Yung+23, GUREFT, z='+str(redshift))
     
 # HMF package HMF (convert to physical units)
@@ -124,179 +152,58 @@ plt.show()
 
 
 
-### Fixing tstep for SFH, NB: deve essere breve abbastanza affinche' SN rate interpolato bene, 1-2 Myr vanno bene
-tstep=1#in [Myr] units
-metall=0.001/Zsun
-### Loading Sn rate from SB99 for instantaneous SFR, and Metallicity=0.004 (1/5 Zsun), Salpeter IMF 1-100 Msun
-logSNr_yr=np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/snr_inst_Z001.txt',usecols=1)
-time_yr=np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/snr_inst_Z001.txt',usecols=0)
-## logL1500, same assumptions, [erg/s/angstrom] units (need to multiply by angstrom)
-L1500_SB99=np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/L1500_inst_Z001.txt',usecols=1)
-time_yr_L1500=np.loadtxt('/Users/lsommovigo/Desktop/Scripts/txt_files/L1500_inst_Z001.txt',usecols=0)
+# ---- SFH and SB99 settings ----
+tstep=1               # SFH timestep [Myr]; must resolve SN rate
+logSNr_yr=np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99', 'snr_inst_Z001.txt'), usecols=1)
+time_yr=np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99', 'snr_inst_Z001.txt'), usecols=0)
+L1500_SB99=np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99', 'L1500_inst_Z001.txt'), usecols=1)
+time_yr_L1500=np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99', 'L1500_inst_Z001.txt'), usecols=0)
 
-###Fixing the dust model
-kUV=kUV_drn #kUV_drn  # choose dust opacity model here
-kUV_abs=kUV_drn_abs
-kv=kv_drn
+# ---- Dust opacity model ----
+# Choose _hir (stellar/Hirashita+19) or _drn (MW/WD01)
+kUV=kUV_hir
+kUV_abs=kUV_hir_abs
+kv=kv_hir
 
 
 
 
-#------------------------------------------------------------------------------------------
-############# Loop in epsilon and yd: compute fract. of optically thick galaxies in the V-band
-#------------------------------------------------------------------------------------------
-arr_e=np.array([0.05, 0.10, 0.20])#[0.2])#0.05, 0.1, 0.6])
-arr_yd=np.array([0.02,0.3])#, 0.3])
+# ============================================================
+#  PARAMETER GRID: star-formation efficiency and dust yield
+# ============================================================
+arr_e=np.array([0.05, 0.10, 0.20])   # SF efficiency
+arr_yd=np.array([0.02,0.3])           # dust yield per SN [Msun/SN]
 colors=np.array([costum_colormap(0), costum_colormap(0.5), costum_colormap(1.)])
+
 # if i only run one
 #colors=np.array([costum_colormap(0.5), costum_colormap(0.5), costum_colormap(0.5)])
 
-# ---------------- FAST: cache + compute f_obsc(Mh) with tau_V > 0.1 ----------------
-# Assumes: logMh_array, arr_e, arr_yd, fb, redshift, tstep, time_yr, time_yr_L1500, 
-#          L1500_SB99, logSNr_yr, halo_fredsto_stellar_mass, Build_SFH_funct, 
-#          compute_Mdust_steps, tau_pred, kv, kUV_drn, kUV_hir are already defined.
 
 # Spin distribution (fixed) reused everywhere
 len_sp_dis = 1000
 spin_param_distr = np.random.lognormal(mean=np.log(10**-1.5677), sigma=0.5390, size=len_sp_dis)
-''' Loop over epsilon and yd to compute fraction of obscured galaxies (tau_V > 0.1) 
-for epsilon in arr_e:
-    print('\n')
-    print('epsilon = ', epsilon)
-
-    # ---------- cache per-(epsilon, Mh): SFH/age + dust kernel Md_fin at yd=1 ----------
-    Mh_grid = 10**logMh_array
-    cached_age = [None]*len(logMh_array)
-    cached_SFH = [None]*len(logMh_array)
-    Md1_fin    = np.empty(len(logMh_array), dtype=float)   # final Md for yd=1 (kernel)
-    for j, Mh in enumerate(Mh_grid):
-        SFH, logMst_build, age = Build_SFH_funct(Mh, redshift, tstep, epsilon)
-        cached_SFH[j] = SFH
-        cached_age[j] = age
-        # run dust once with yd=1.0, then scale later
-        _, Md_arr_1 = compute_Mdust_steps(age, tstep, SFH, time_yr, logSNr_yr, yd=1.0)
-        Md1_fin[j] = Md_arr_1[-1]
-
-    # stellar mass only depends on epsilon (not on yd) -> compute once
-    Mstar_array = halo_to_stellar_mass(Mh_grid, fb, epsilon)
-    logMstar = np.log10(Mstar_array)
-
-    for yd in arr_yd:
-        print('yd = ', yd)
-
-        # scale dust kernel to the requested yield
-        Md_fin = yd * Md1_fin   # final Md at this yd for each mass bin
-
-        # per-Mh obscured fraction (tau_V > 0.1) using the spin ensemble
-        # NOTE: we DO NOT accumulate across masses; this is bin-by-bin.
-        f_obsc = np.empty(len(logMh_array), dtype=float)
-
-        for j, Mh in enumerate(Mh_grid):
-            tauV = tau_pred(kv, Md_fin[j], Mh, spin_param_distr, redshift)  # array over spins
-            f_obsc[j] = np.mean(tauV > 0.1)
-
-        # ------- SAVE -------
-        outpath_base = '/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/Low_Obscured_fract'
-        suffix = f"_1e3yd{int(1e3*yd)}_100eps{int(100*epsilon)}_z{int(redshift)}"
-        if kv == kUV_hir:
-            outfile = outpath_base + suffix + '_HiroDust.txt'
-        else:
-            outfile = outpath_base + suffix + '.txt'
-
-        header = (
-            f"yd={yd}, e_star={epsilon}\n"
-            "log(Mhalo/Msun)      log(Mstar/Msun)      n(tau_V>1e-1)/n per unit Mpc^-3"
-        )
-        np.savetxt(outfile, np.c_[logMh_array, logMstar, f_obsc], header=header)
-        print("Saved:", outfile)
 
 
-#### Plotting fraction of obscured galaxies as a function of epsilon_star and yd
-fig = plt.figure()
-ax1 = fig.add_subplot(111)
-for e in range(len(arr_e)):
-    epsilon=arr_e[e]
-    
-    for y in range(len(arr_yd)):
-        yd=arr_yd[y]
-        
-        if yd==0.1:
-            ls=':'
-        
-        if yd==0.001:
-            ls='-.'
-        
-        if yd==0.01:
-            ls='--'
-        
-        ## Loading data
-        # --- Read the correct obscured-fraction file depending on dust opacity model ---
-        base = "/Users/lsommovigo/Desktop/Scripts/txt_files/JWST_dust_z10/Low_Obscured_fract"
-        suffix = f"_1e3yd{int(1e3*yd)}_100eps{int(100*epsilon)}_z{int(redshift)}"
+# ============================================================
+#  UV LUMINOSITY FUNCTION (uniform dust shell)
+# ============================================================
+# Strategy: instead of drawing 1000 random spins per halo, use
+# K_SPINS deterministic quantiles of the lognormal spin distribution
+# and blend median/mean transmission (W_BLEND knob).
+# This gives smooth, reproducible results with far fewer evaluations.
+# ============================================================
 
-        if kUV == kUV_hir:
-            filename = base + suffix + "_HiroDust.txt"
-        elif kUV == kUV_drn:
-            filename = base + suffix + ".txt"
-        else:
-            raise ValueError("Unknown kUV model: must match kUV_hir or kUV_drn")
+K_SPINS = 7        # stratified spin quantiles per halo mass (5-9 works well)
+W_BLEND = 0.6      # blend weight: 0 = pure median T, 1 = pure mean T
 
-        # --- Load columns ---
-        logMh_list, logMst_list, fobsc_list = np.loadtxt(filename, usecols=(0, 1, 2), unpack=True)
+# ---- shared setup ----
+dndlogM = dn_dlogMh_GUREFT(logMh_array, redshift)  # HMF [Mpc^-3 dex^-1]
+mu_ln, sig_ln = np.log(10**-1.5677), 0.5390         # lognormal spin params (Yung+23)
 
-
-        ## Plot obscured (tau_V>0.1) fraction as a function of Mstar
-        plt.plot(logMst_list, fobsc_list, label='$y_d/\mathrm{M_{\odot}}$ = '+str(yd), color=colors[e], ls=ls, lw=2., alpha=0.6)
-        #plt.scatter(logMst_list, fobsc_list, edgecolors=costum_colormap(epsilon), alpha=0.2, s=35, color='none')
-
-        #### Fraction of obscured (tau_V>0.1) galaxies per unit volume (multiplying previous number for HMF and integrating over Mh range)
-        #print( 'num of obscured galaxies per unit volume ->', np.trapz(dn_dlogMh_GUREFT(logMh_list,redshift)*fobsc_list,logMh_list), ' -- for eps=', epsilon, ', yd=', yd)
-        #print( 'num of gal. per unit volume ->', (cosmo.comoving_volume(redshift+0.01)-cosmo.comoving_volume(redshift-0.01))*np.trapz(dn_dlogMh_GUREFT(logMh_list,redshift),logMh_list))
-        print('ratio of obscured (tau_V>0.1) galaxies (%) -->', 100*np.trapz(dn_dlogMh_GUREFT(logMh_list,redshift)*fobsc_list,logMh_list) / np.trapz(dn_dlogMh_GUREFT(logMh_list,redshift),logMh_list))
-        print()
-        print()
-        
-        if e==0:
-            plt.legend(fontsize=12, loc='lower left')
-
-ax1.set_yscale('log')
-ax1.set_xlabel('$\log (M_{\star}/M_{\odot})$', fontsize=18)
-ax1.set_ylabel(' $n(\\tau_V>0.1) / n_{tot}$', fontsize=18)
-##
-ax1.plot(np.linspace(4, 12,10),0.5*np.ones(10),color='grey', alpha=0.2,lw=4.)
-ax1.text(10.4,0.49,'50\%', color='grey', fontsize=18,alpha=0.9,fontweight='bold')
-ax1.set_xlim(7,10.9)
-ax1.set_ylim(0.9e-2,1.05)
-#ax1.text(5.9, 0.0033, '$\epsilon_{\star}=$0.1', color=colors[1], fontsize=20, fontweight='bold')
-ax1.text(7.1, 0.023, '$\epsilon_{\star}=$0.05, ', color=colors[0], fontsize=20, fontweight='bold')
-ax1.text(7.67, 0.023, '   0.1,', color=colors[1], fontsize=20, fontweight='bold')
-ax1.text(7.9, 0.023, ' 0.5', color=colors[2], fontsize=20, fontweight='bold')
-
-plt.tight_layout()
-plt.show()
-
-'''
-
-
-
-
-
-#-------------------------------------------------------
-######### UV LF with SN dust correction (z=redshift)
-#-------------------------------------------------------
-
-# ---- knobs for the "in-between" behavior ----
-K_SPINS = 7        # small number of stratified spins per mass (5–9 works well)
-W_BLEND = 0.6      # 0=median, 1=mean; pick ~0.5–0.7 for "in-between"
-
-# ---- setup shared stuff ----
-dndlogM = dn_dlogMh_GUREFT(logMh_array, redshift)  # [Mpc^-3 dex^-1]
-mu_ln, sig_ln = np.log(10**-1.5677), 0.5390
-
-# fixed stratified quantiles in (0,1)
+# deterministic stratified quantiles of the spin distribution
 u = (np.arange(1, K_SPINS+1) - 0.5) / K_SPINS
 z = norm.ppf(u)                          # standard-normal quantiles
-spin_quant = np.exp(mu_ln + sig_ln*z)    # lognormal quantiles for lambda, shape (K_SPINS,)
+spin_quant = np.exp(mu_ln + sig_ln*z)    # lognormal quantiles for spin, shape (K_SPINS,)
 
 fig, ax = plt.subplots(figsize=(9,7))
 
@@ -325,7 +232,7 @@ for e, epsilon in enumerate(arr_e):
         for j, Mh in enumerate(Mh_grid):
             # tau for K spins at this Mh
             tauK = tau_pred(kUV, Md_grid[j], Mh, spin_quant, redshift)   # expects vector spins
-            TK   = T_1500_sphere_im(tauK)                                   # shape (K_SPINS,)
+            TK   = T_sphere_mixed(tauK)                                   # shape (K_SPINS,)
 
             T_med  = np.median(TK)
             T_mean = np.mean(TK)
@@ -334,7 +241,9 @@ for e, epsilon in enumerate(arr_e):
         # attenuated mags using the blended transmission
         MUV_att = L1500_to_MUV_conv(T_eff * L1500_grid)
 
-        # ---- Jacobian -> LFs ----
+        # ---- Jacobian transformation: HMF -> UV LF ----
+        # phi(MUV) = (dn/dlogMh) / |dMUV/dlogMh|
+        # This is a change-of-variable from halo mass to UV magnitude.
         dMUV_dlogM_att  = np.gradient(MUV_att,  logMh_array)
         dMUV_dlogM_intr = np.gradient(MUV_intr, logMh_array)
 
@@ -359,30 +268,30 @@ for e, epsilon in enumerate(arr_e):
         phi_att  = np.where(np.isfinite(phi_att)  & (phi_att > 0),  phi_att,  np.nan)
         phi_intr = np.where(np.isfinite(phi_intr) & (phi_intr > 0), phi_intr, np.nan)
         
-        ax.plot(MUV_att,  phi_att,  lw=3.0, ls=ls, color=colors[e])#,label=fr"ATT: $\epsilon$={epsilon}, $y_d$={yd}", alpha=0.9)#(K={K_SPINS}, w={W_BLEND})
+        ax.plot(MUV_att,  phi_att,  lw=3.0, ls=ls, color=colors[e], alpha=0.8)#,label=fr"ATT: $\epsilon$={epsilon}, $y_d$={yd}", alpha=0.9)#(K={K_SPINS}, w={W_BLEND})
             
-    
-    ax.plot(MUV_intr, phi_intr, lw=4., color=colors[e], alpha=0.45)#label=fr"Intrinsic, $\epsilon$={epsilon}"
-    
-    # in line text for clarity, specifying SF efficiency
-    idx = int(0.58 * len(MUV_intr))
-    x_eps  = MUV_intr[idx]
-    y_eps  = 1.3*phi_intr[idx]
-    ax.text(x_eps, y_eps,fr'$\epsilon_\star={epsilon*100:.0f}\%$',fontsize=20, color=colors[e],
-            rotation=-50, rotation_mode='anchor', ha='left', va='bottom', alpha=0.6)
+    if redshift>=10:
+        ax.plot(MUV_intr, phi_intr, lw=3., color=colors[e], alpha=0.4,zorder=-10000)#label=fr"Intrinsic, $\epsilon$={epsilon}"
+        # in line text for clarity, specifying SF efficiency
+        idx = int(0.6 * len(MUV_intr))
+        x_eps  = MUV_intr[idx-1]
+        y_eps  = 1.3*phi_intr[idx-1]
+        ax.text(x_eps, y_eps,fr'$\epsilon_\star={epsilon*100:.0f}\%$',fontsize=17, color=colors[e],
+                rotation=-50, rotation_mode='anchor', ha='left', va='bottom', alpha=0.5)
 
 
 # ---- Big free-floating labels + short horizontal line segments ----
 # y_d = 1e-3  (dash-dot)
-x0, y0 = 0.74, 0.815   # text anchor
+x0, y0 = 0.78, 0.91#0.74, 0.81   # text anchor
 line_length = 0.10    # fraction of axes width
 ax.plot([x0 - line_length, x0 - 0.01], [y0, y0], transform=ax.transAxes, color='black', lw=3, ls='-.')
-ax.text(x0, y0, r'$y_d = 0.02\,\mathrm{M_\odot}$',transform=ax.transAxes,fontsize=18, color='black',ha='left', va='center')
+ax.text(x0, y0, r'$ y_d = 0.02\,\mathrm{M_\odot}$',transform=ax.transAxes,fontsize=16, color='black',ha='left', va='center')
 # y_d = 0.3 (dashed)
-x1, y1 = 0.74, 0.755
+x1, y1 =0.78, 0.85#0.74, 0.75
 ax.plot([x1 - line_length, x1 - 0.01], [y1, y1],transform=ax.transAxes,color='black', lw=3, ls=':')
-ax.text(x1, y1,r'$y_d = 0.3\,\mathrm{M_\odot}$',transform=ax.transAxes,fontsize=18, color='black', ha='left', va='center')
-
+ax.text(x1, y1,r'$y_d = 0.3\,\mathrm{M_\odot}$',transform=ax.transAxes,fontsize=16, color='black', ha='left', va='center')
+# specify redhsift
+#ax.text(x1, 0.9*y1, fr'$z={redshift:.0f}$',transform=ax.transAxes,fontsize=20, color='black', ha='left', va='center')
 
 
 # Data & axes
@@ -412,27 +321,15 @@ plt.show()
 
 
 
-'''
-#-------------------------------------------------------
-######### IR LF (z=redshift)
-#-------------------------------------------------------
 
-# knobs for the in-between estimator (define only if missing)
-if 'K_SPINS' not in locals(): K_SPINS = 7    # 5–9 works nicely
-if 'W_BLEND' not in locals(): W_BLEND = 0.6  # 0=median, 1=mean
-if 'albedo'  not in locals(): albedo  = 0.3807
-
-# spin quantiles (deterministic stratified sampling) — define only if missing
-if 'spin_quant' not in locals():
-    from scipy.stats import norm
-    if 'mu_ln' not in locals() or 'sig_ln' not in locals():
-        mu_ln, sig_ln = np.log(10**-1.5677), 0.5390
-    u = (np.arange(1, K_SPINS+1) - 0.5) / K_SPINS
-    z = norm.ppf(u)
-    spin_quant = np.exp(mu_ln + sig_ln * z)  # shape (K_SPINS,)
-
-# HMF (use existing if available)
-dndlogM_IR = dndlogM if 'dndlogM' in locals() else dn_dlogMh_GUREFT(logMh_array, redshift)
+# ============================================================
+#  IR LUMINOSITY FUNCTION (uniform dust shell)
+# ============================================================
+# L_IR = f_abs * L_1500 * nu_1500, where f_abs = 1 - T(tau_abs).
+# Uses the ABSORPTION opacity (kUV_abs) not the extinction opacity,
+# because scattered photons are not absorbed and don't heat dust.
+# ============================================================
+dndlogM_IR = dndlogM
 Mh_grid = 10**logMh_array
 nu_1500 = 3e10 / (1500e-8)  # Hz
 
@@ -459,31 +356,18 @@ for e, epsilon in enumerate(arr_e):
         # scale dust kernel to this yd
         Md_grid = yd * Md1_grid
 
-        # effective absorbed fraction via stratified spins + mean/median blend
+        # Effective absorbed fraction via stratified spins + blend
         A_eff = np.empty_like(Mh_grid, float)
         for j, Mh in enumerate(Mh_grid):
-            Md_j = float(Md_grid[j])        # scalar
-            Mh_j = float(Mh)                # scalar
-            
-            # tau_ext (scatt + abs) for K spins at this Mh
-            tauK = np.array(
-                [tau_pred(kUV, Md_j, Mh_j, float(lam), redshift)
-                 for lam in spin_quant],
-                dtype=float
-            )  # shape (K_SPINS,)
-            
-            # tau_abs (abs only) for K spins at this Mh
-            tauK_abs = np.array(
-                [tau_pred(kUV_abs, Md_j, Mh_j, float(lam), redshift)
-                 for lam in spin_quant],
-                dtype=float
-            )  # shape (K_SPINS,)
+            # tau for K spins: need both extinction (for T) and absorption (for f_abs)
+            tauK     = tau_pred(kUV,     Md_grid[j], Mh, spin_quant, redshift)
+            tauK_abs = tau_pred(kUV_abs, Md_grid[j], Mh, spin_quant, redshift)
 
-            TK   = T_1500_sphere_im(tauK)        # transmission given spin
-            AK   = 1.0 - T_1500_sphere_im(tauK_abs)                    # absorbed fraction given spin
+            TK   = T_sphere_mixed(tauK)        # transmission given spin
+            AK   = 1.0 - T_sphere_mixed(tauK_abs)                    # absorbed fraction given spin
             A_eff[j] = (1.0 - W_BLEND) * np.median(AK) + W_BLEND * np.mean(AK)
 
-        # IR luminosity from absorbed UV 
+        # IR luminosity from absorbed UV: L_IR = f_abs * L_UV * nu_UV
         LIR = A_eff * L1500_grid * nu_1500
         logLIR = np.log10(LIR / Lsun)
 
@@ -522,6 +406,10 @@ plt.ylabel(r'$\phi(L_{\rm IR})\ [\mathrm{Mpc^{-3}\,dex^{-1}}]$')
 plt.xlabel(r'$\log (L_{\rm IR}/L_{\odot})$')
 plt.ylim(1.e-7, 1e-3)
 plt.xlim(10.4, 13.4)
+
+# specify redhsift
+plt.text(12.9, 3e-4, fr'$z={redshift:.0f}$', fontsize=20, color='black')
+
 plt.legend(fontsize=12)
 plt.subplots_adjust(left=0.12, bottom=0.087, right=0.983, top=0.958, wspace=0.2, hspace=0.2)
 plt.show()
@@ -529,4 +417,3 @@ plt.show()
 
 
 
-'''
