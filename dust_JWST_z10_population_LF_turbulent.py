@@ -227,7 +227,7 @@ z_nodes = norm.ppf(u_nodes)
 # --- invert T_sphere_mixed: precompute τ(T) lookup once ---
 tau_max_lookup = 20.0
 N_tau          = 4000
-tau_grid = np.linspace(0.0, tau_max_lookup, N_tau)
+tau_grid = np.linspace(1e-3, tau_max_lookup, N_tau)  # start > 0: T_sphere_mixed(0) is undefined
 T_grid  = T_sphere_mixed(tau_grid)          # T(τ) for UV
 
 # make T increasing for interpolation τ(T)
