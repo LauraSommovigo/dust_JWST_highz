@@ -6,7 +6,7 @@
 #   - Dust opacity constants (loaded from GSD.py output or fallback)
 #   - Halo mass function (Yung+23 / GUREFT fitting functions)
 #   - Star-formation history builder (Build_SFH_funct)
-#   - SB99 convolution routines (L1500, SN rate, Nion)
+#   - SB99 convolution routines (L1500, SN rate, Nion rate)
 #   - Dust mass build-up from SN yields
 #   - Radiative transfer transmission functions:
 #       T_slab, T_sphere_central, T_sphere_mixed
