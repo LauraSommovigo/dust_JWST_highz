@@ -117,7 +117,7 @@ costum_colormap = truncate_colormap(costum_colormap, 0., 0.7)
 # ============================================================
 #  MODEL PARAMETERS
 # ============================================================
-redshift=7.           # target redshift (7 or 10)
+redshift=14.           # target redshift (>7)
 fb=cosmo.Ob(redshift)/cosmo.Om(redshift)
 lumDistpc = cosmo.luminosity_distance(redshift).value * 1e6  # luminosity distance [pc]
 logMh_array=np.linspace(8,13,70)  # halo mass grid; finer than uniform script for smoother CDF integrals
@@ -162,9 +162,9 @@ time_yr_L1500=np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99', 'L1500_inst
 
 # ---- Dust opacity model ----
 # Choose _drn (MW/WD01) or _hir (stellar/Hirashita+19)
-kUV=kUV_drn
-kUV_abs=kUV_drn_abs
-kv=kv_drn
+kUV=kUV_hir
+kUV_abs=kUV_hir_abs
+kv=kv_hir
 
 
 
@@ -428,21 +428,21 @@ for e, epsilon in enumerate(arr_e):
 
 
 # ---- Big free-floating labels + short horizontal line segments ----
-x0, y0 = 0.74, 0.915   # text anchor, 0.74, 0.915 for z=7, for z=14 0.74, 0.815
+x0, y0 = 0.74, 0.815   # text anchor, 0.74, 0.915 for z=7, for z=14 0.74, 0.815
 line_length = 0.10
 ax_uv.plot([x0 - line_length, x0 - 0.01], [y0, y0],
            transform=ax_uv.transAxes, color='black', lw=3, ls='-.')
 ax_uv.text(x0, y0, r'$y_d = 0.02\,\mathrm{M_\odot}$',
            transform=ax_uv.transAxes, fontsize=18, color='black',
            ha='left', va='center')
-x1, y1 = 0.74, 0.865 ## text anchor, 0.74, 0.865 for z=7, for z=14 0.74, 0.755
+x1, y1 = 0.74, 0.755 ## text anchor, 0.74, 0.865 for z=7, for z=14 0.74, 0.755
 ax_uv.plot([x1 - line_length, x1 - 0.01], [y1, y1],
            transform=ax_uv.transAxes, color='black', lw=3, ls=':')
 ax_uv.text(x1, y1, r'$y_d = 0.3\,\mathrm{M_\odot}$',
            transform=ax_uv.transAxes, fontsize=18, color='black',
            ha='left', va='center')
 # specify redshift
-#ax_uv.text(x1, 0.9*y1, fr'$z={redshift:.0f}$',transform=ax_uv.transAxes,fontsize=20, color='black', ha='left', va='center')
+ax_uv.text(x1, 0.9*y1, fr'$z={redshift:.0f}$',transform=ax_uv.transAxes,fontsize=20, color='black', ha='left', va='center')
 
 # --- cosmetics ---
 Plot_LF_Data(redshift, ax=ax_uv)

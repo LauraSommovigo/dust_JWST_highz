@@ -1107,7 +1107,7 @@ def make_shades(base_color):
     darkest, medium, lightest.
     """
     base = np.array(matplotlib.colors.to_rgb(base_color))
-    factors = [1.0, 0.65, 0.25]  # 1.0 = base, <1 = closer to white
+    factors = [1.0, 0.45, 0.2]  # 1.0 = base, <1 = closer to white
     shades = [tuple(1 - f * (1 - base)) for f in factors]
     return shades  # [shade_ps, shade_mix, shade_s24]
 

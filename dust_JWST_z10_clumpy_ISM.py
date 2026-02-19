@@ -25,6 +25,8 @@ from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
 import matplotlib.gridspec as gridspec
 from scipy.stats import norm, gaussian_kde
+import matplotlib.pyplot as plt
+import numpy as np
 
 # ======== DUST CONSTANTS ===========
 # Loaded from highz_gal_SAM.py, originally computed in GSD.py
@@ -105,8 +107,8 @@ time_yr_L1500 = np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99/L1500_inst_
 # Pick a single characteristic halo, build its SFH, and compute
 # the final dust mass, L_UV, and tau_UV from the spin distribution.
 # ============================================================
-redshift = 7.0
-logMh = 11.6#10.86#0.9
+redshift = 12.37#internmeidate redshift for IR followed up BMs z=12.37, otherwise z=7
+logMh = 10.68#10.68#11.6 (for z=7), good intermediate values for BMs (z=12.37) is 10.68
 fb = cosmo.Ob(redshift) / cosmo.Om(redshift)
 epsilon = 0.1
 yd = 0.1
@@ -584,32 +586,49 @@ if redshift == 7:
     for jj in range(len(REBELS_index)):
         plt.errorbar(np.log10(158*reds_REB[jj]), np.log10(IR_Flux_REB[jj]), yerr=[[np.log10(IR_Flux_REB[jj] + err_IR_Flux_REB[jj]) - np.log10(IR_Flux_REB[jj])], [-np.log10(IR_Flux_REB[jj] - err_IR_Flux_REB[jj]) + np.log10(IR_Flux_REB[jj])]], ms=10.,marker='s',capsize=2.5,mec='black',elinewidth=0.5,alpha=0.8, color=custom_colormap((logMstar_REB_npSFH[jj] -6.2)/4.2), mew=0.3)
 
-import matplotlib.pyplot as plt
-import numpy as np
+# Blue monsters upper limits
+if redshift>7: 
+    for pp in range(len(redshift_meas)):
+        if IR_Flux_meas[pp]>0:
+            print('\n z=', redshift_meas[pp])
+            print('lambda_rf/micron ->', lambda_obs_meas[pp])
+            print('log (lambda_obs/micron)->', np.log10(lambda_obs_meas[pp]*(1.+redshift_meas[pp])))
+            plt.errorbar(np.log10(lambda_obs_meas[pp]*(1.+redshift_meas[pp])), np.log10(IR_Flux_meas[pp]), uplims=bool(uplims_IRFlux[pp]), yerr=0.01*IR_Flux_meas[pp], ms=10.,marker='h',capsize=2.5,mec='black',elinewidth=0.5,alpha=0.8, color=custom_colormap((log_Mstar_meas[pp]- 6.19904499)/(10.19904499- 6.19904499)) ,mew=0.3)
+            plt.text(np.log10(lambda_obs_meas[pp] * (1. + redshift_meas[pp])) - 0.04, np.log10(IR_Flux_meas[pp])+0.04, str(names[pp]), fontsize=10, color=custom_colormap((log_Mstar_meas[pp] - 6.19904499) / (10.19904499 - 6.19904499)))
 
 cmap = plt.cm.magma      # choose your colormap here
 colors = cmap(np.linspace(0.2, 0.8, 4))  # 4 nice evenly spaced colors
-plt.text(2.7, 0.85, 'ALMA Bands', fontsize=18, alpha=0.3)
+
 # y-range for the fills
 yr = np.linspace(-5, 4.3, 100)
 # Band 6
 plt.fill_betweenx(yr, np.log10(1.1e3), np.log10(1.4e3),
                   color=colors[0], alpha=0.1, zorder=-100)
-plt.text(np.log10(1.19e3), 1, '6', fontsize=16, color=colors[0], alpha=0.5)
 # Band 7
 plt.fill_betweenx(yr, np.log10(0.8e3), np.log10(1.1e3),
                   color=colors[1], alpha=0.1, zorder=-100)
-plt.text(np.log10(0.9e3), 1, '7', fontsize=16, color=colors[1], alpha=0.5)
 # Band 8
 plt.fill_betweenx(yr, np.log10(0.6e3), np.log10(0.8e3),
                   color=colors[2], alpha=0.1, zorder=-100)
-plt.text(np.log10(0.65e3), 1, '8', fontsize=16, color=colors[2], alpha=0.5)
 # Band 9
 plt.fill_betweenx(yr, np.log10(0.4e3), np.log10(0.5e3),
                   color=colors[3], alpha=0.1, zorder=-100)
-plt.text(np.log10(0.45e3), 1, '9', fontsize=16, color=colors[3], alpha=0.5)
 
-plt.ylim(0.77, 2.45)
+if redshift==7:
+    plt.ylim(0.77, 2.45)
+    plt.text(np.log10(1.19e3), 1, '6', fontsize=16, color=colors[0], alpha=0.5)
+    plt.text(np.log10(0.9e3), 1, '7', fontsize=16, color=colors[1], alpha=0.5)
+    plt.text(np.log10(0.65e3), 1, '8', fontsize=16, color=colors[2], alpha=0.5)
+    plt.text(np.log10(0.45e3), 1, '9', fontsize=16, color=colors[3], alpha=0.5)
+    plt.text(2.7, 0.85, 'ALMA Bands', fontsize=18, alpha=0.3)
+else:
+    plt.ylim(-0.7,1.8)
+    plt.text(np.log10(1.19e3), -0.5, '6', fontsize=16, color=colors[0], alpha=0.5)
+    plt.text(np.log10(0.9e3), -0.5, '7', fontsize=16, color=colors[1], alpha=0.5)
+    plt.text(np.log10(0.65e3), -0.5, '8', fontsize=16, color=colors[2], alpha=0.5)
+    plt.text(np.log10(0.45e3), -0.5, '9', fontsize=16, color=colors[3], alpha=0.5)
+    plt.text(2.7, -0.65, 'ALMA Bands', fontsize=18, alpha=0.3)
+
 plt.xlim(2.,3.35)
 plt.xlabel(r'$\log\,(\lambda_{\rm obs}/\mu{\rm m})$')
 plt.ylabel(r'$\log\,(F_{\nu}/{\rm \mu Jy})$')

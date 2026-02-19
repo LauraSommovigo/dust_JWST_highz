@@ -795,7 +795,7 @@ err_logMstar_low_meas  = df['err_logMstar_low'].values
 err_logMstar_high_meas = df['err_logMstar_high'].values
 IR_Flux_meas         = df['IR_Flux'].values
 uplims_IRFlux        = df['uplim_IRFlux'].values
-lambda_obs           = df['lambda_obs'].values
+lambda_obs_meas      = df['lambda_obs'].values
 betaUV_meas=df['betaUV_obs'].values
 
 

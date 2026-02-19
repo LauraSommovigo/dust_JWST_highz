@@ -116,7 +116,7 @@ costum_colormap = truncate_colormap(costum_colormap, 0., 0.7)
 # ============================================================
 #  MODEL PARAMETERS
 # ============================================================
-redshift=7.           # target redshift (7 or 10)
+redshift=10.           # target redshift (>7)
 fb=cosmo.Ob(redshift)/cosmo.Om(redshift)
 lumDistpc = cosmo.luminosity_distance(redshift).value * 1e6  # luminosity distance [pc]
 logMh_array=np.linspace(8,13,23)  # halo mass grid [log10 Msun]; same range as Yung+23
@@ -161,9 +161,9 @@ time_yr_L1500=np.loadtxt(os.path.join(SCRIPTS_DIR, 'txt_files/SB99', 'L1500_inst
 
 # ---- Dust opacity model ----
 # Choose _hir (stellar/Hirashita+19) or _drn (MW/WD01)
-kUV=kUV_hir
-kUV_abs=kUV_hir_abs
-kv=kv_hir
+kUV=kUV_drn
+kUV_abs=kUV_drn_abs
+kv=kv_drn
 
 
 
