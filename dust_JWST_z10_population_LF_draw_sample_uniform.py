@@ -116,7 +116,7 @@ costum_colormap = truncate_colormap(costum_colormap, 0., 0.7)
 # ============================================================
 #  MODEL PARAMETERS
 # ============================================================
-redshift=10.           # target redshift (>7)
+redshift=7.           # target redshift (>7)
 fb=cosmo.Ob(redshift)/cosmo.Om(redshift)
 lumDistpc = cosmo.luminosity_distance(redshift).value * 1e6  # luminosity distance [pc]
 logMh_array=np.linspace(8,13,23)  # halo mass grid [log10 Msun]; same range as Yung+23
@@ -292,6 +292,24 @@ ax.plot([x1 - line_length, x1 - 0.01], [y1, y1],transform=ax.transAxes,color='bl
 ax.text(x1, y1,r'$y_d = 0.3\,\mathrm{M_\odot}$',transform=ax.transAxes,fontsize=16, color='black', ha='left', va='center')
 # specify redhsift
 #ax.text(x1, 0.9*y1, fr'$z={redshift:.0f}$',transform=ax.transAxes,fontsize=20, color='black', ha='left', va='center')
+
+
+# ---- ε_star colored horizontal labels (for z!=10)----
+if redshift!=10: 
+    x_eps0 = 0.7          # left margin (axes fraction)
+    y_eps0 = 0.78          # top starting height
+    dy     = 0.06          # vertical spacing
+    line_length = 0.08     # horizontal line length (axes fraction)
+
+    for e, epsilon in enumerate(arr_e):
+        y_here = y_eps0 - e * dy
+
+        # short solid line in same color as curves
+        ax.plot([x_eps0, x_eps0 + line_length],[y_here, y_here],transform=ax.transAxes,color=colors[e],lw=4,ls='-')
+
+        # text label
+        ax.text(x_eps0 + line_length + 0.01,y_here,fr'$\epsilon_\star={epsilon*100:.0f}\%$',transform=ax.transAxes,fontsize=17,color=colors[e],ha='left',va='center')
+
 
 
 # Data & axes

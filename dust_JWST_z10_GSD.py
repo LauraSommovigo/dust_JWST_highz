@@ -14,6 +14,7 @@ import matplotlib.gridspec as gridspec
 from scipy.special import erf
 from matplotlib.ticker import LogFormatter
 from matplotlib.lines import Line2D
+import matplotlib.colors as mcolors
 
 # ============================================================
 #  SECTION 1: Load Draine optical-property tables
@@ -496,8 +497,8 @@ Yc = 1e29 * (a_grid**4) * dn_da_C    # for carbonaceous
 Ys = 1e29 * (a_grid**4) * dn_da_Si   # for silicates
 
 plt.figure(figsize=(7,5))
-plt.loglog(a_grid*1e4, Yc, color='indigo', label='Carbonaceous')
-plt.loglog(a_grid*1e4, Ys, color='darkorange', label='Silicate')
+plt.loglog(a_grid*1e4, Yc, color='indigo', label='Carbonaceous, WD01')
+plt.loglog(a_grid*1e4, Ys, color='darkorange', label='Silicate, WD01')
 
 plt.xlabel(r'Grain radius $a\,[\mu{\rm m}]$')
 plt.ylabel(r'$10^{29}\, a^{4} (n_{\rm H}^{-1} dn/da)$ [cm$^{3}$]')
@@ -837,31 +838,12 @@ g_tot_star = (g_c_star * w_c_star + g_s_star * w_s_star) / (w_c_star + w_s_star)
 print('kext_1500_stellar [cm^2/g] -->', kappa_ext_star_tot[lam_A==1585])   
 kUV_hir=kappa_ext_star_tot[lam_A==1585]
 
-# ------------------------------------------------------------------
-# 3. (Optional) compare stellar vs WD01 MW
-# ------------------------------------------------------------------
-lam_A = lam_um * 1e4  # µm → Å
-
-plt.figure(figsize=(7,5))
-plt.loglog(lam_A, kappa_abs_tot,      'k--',   lw=1, label='MW WD01 (abs)')
-plt.loglog(lam_A, kappa_ext_tot,      'k', lw=1.5, label='MW WD01 (tot)')
-plt.loglog(lam_A, kappa_abs_star_tot, 'r--', lw=1, label='Stellar (abs)')
-plt.loglog(lam_A, kappa_ext_star_tot, 'r',  lw=1.5, label='Stellar (tot)')
-plt.xlim(923, 2e4)
-plt.ylim(1e2, 1e6)
-plt.xlabel(r'$\lambda\ [\AA]$')
-plt.ylabel(r'$\kappa_{\lambda}\ [{\rm cm}^2\,{\rm g}^{-1}]$', fontsize=14)
-plt.legend(frameon=False,fontsize=14)
-plt.grid(alpha=0.25)
-plt.tight_layout()
-plt.show()
-
-
 
 # ==========================================================
 # FIGURE: Compare MW WD01 vs stellar dust: kappa(lambda)
 # with inset showing a^4 dn/da  (Paper Fig. 5)
 # ==========================================================
+lam_A = lam_um * 1e4  # µm → Å
 lam_um = wavelength_c                     # = wavelength_s
 lam_A  = lam_um * 1e4                     # µm → Å
 
@@ -1130,9 +1112,14 @@ def plot_family(ax, kappa_ext_tot, omega_tot, g_tot,
 
     # generate 3 shades for the 3 transfer functions
     shade_ps, shade_mix, shade_s24 = make_shades(color)
+    
+    # Force more separated teals for the stellar panel
+    if title == "Stellar dust":
+        shade_ps  = "#027876"   # darker teal
+        shade_mix = "#76d7c4"   # lighter / greener teal
+        shade_s24 = "#a7e9df"   # very light (won't be shown anyway on stellar)
 
     for Av in Av_values:
-        transp = alpha_map[Av]
         lw = lw_map[Av]
 
         # Convert desired A_V at V band to Σ_d
@@ -1150,7 +1137,8 @@ def plot_family(ax, kappa_ext_tot, omega_tot, g_tot,
         A_norm_ps = A_lam_ps / A_lam_ps[i_V]
 
         # Label only for A_V = 1
-        label_ps = rf"PS, $A_V={Av:.1f}$" #if np.isclose(Av, 1.0) else None
+        label_ps = "PS" if np.isclose(Av, Av_values[1]) else None
+
 
         ax.plot(
             lam_ang,
@@ -1173,7 +1161,7 @@ def plot_family(ax, kappa_ext_tot, omega_tot, g_tot,
         )
         A_norm_mix = A_lam_mix / A_lam_mix[i_V]
 
-        label_mix = rf"Mix, $A_V={Av:.1f}\ (fid)$" #if np.isclose(Av, 1.0) else None
+        label_mix = "Mix" if np.isclose(Av, Av_values[1]) else None
 
         ax.plot(
             lam_ang,
@@ -1187,15 +1175,15 @@ def plot_family(ax, kappa_ext_tot, omega_tot, g_tot,
         )
 
         # --- Sommovigo+24 model ---
-        # attenuation_s25 returns A_lambda for a given A_V
-        A_norm_s24 = attenuation_s25(lam_um, Av)
+        # attenuation_s25 returns A_lambda/A_V for a given A_V
+        A_over_Av_s24 = attenuation_s25(lam_um, Av)
 
-        label_s24 = rf"Sommovigo+25, $A_V={Av:.1f}$" #if np.isclose(Av, 1.0) else None
+        label_s24 = "Sommovigo+25" if np.isclose(Av, Av_values[1]) else None
 
         if title=="MW dust":
             ax.plot(
                 lam_ang,
-                A_norm_s24,
+                A_over_Av_s24,
                 color=shade_s24,
                 lw=lw,
                 ls=ls_map[Av],
@@ -1259,8 +1247,47 @@ axes[0].set_ylabel(r"$A_{\lambda}/A_V$", fontsize=16)
 axes[0].set_ylim(0, 10)
 
 # Put legend on the right panel only (labels only for A_V=1)
-ax_mw.legend(loc='best', fontsize=12, frameon=False)
-ax_stellar.legend(loc='best', fontsize=12, frameon=False)
+# ---- Legend 1: line styles = Av (black lines) ----
+av_handles = [
+    Line2D([0], [0], color="k", lw=2.5, ls=ls_map[Av], label=f"$A_V={round(Av,1):g}$")
+    for Av in Av_values
+]
+leg_av = ax_mw.legend(handles=av_handles, loc="upper center", bbox_to_anchor=(0.35, 1.0),
+                      fontsize=12, frameon=False, ncol=1)
+
+# ---- Legend 2: model legend (colored) ----
+# MW panel: include PS/Mix/Sommovigo/MW obs
+handles_mw, labels_mw = ax_mw.get_legend_handles_labels()
+# Keep only unique labels, in order
+seen = set()
+model_handles_mw = []
+model_labels_mw = []
+for h, lab in zip(handles_mw, labels_mw):
+    if lab and lab not in seen:
+        seen.add(lab)
+        model_handles_mw.append(h)
+        model_labels_mw.append(lab)
+
+leg_models_mw = ax_mw.legend(model_handles_mw, model_labels_mw,
+                            loc="upper right", fontsize=12, frameon=False)
+
+# Put the Av legend back on top of the MW panel (so you have both)
+ax_mw.add_artist(leg_av)
+
+# Stellar panel: only PS and Mix
+handles_st, labels_st = ax_stellar.get_legend_handles_labels()
+seen = set()
+model_handles_st = []
+model_labels_st = []
+for h, lab in zip(handles_st, labels_st):
+    if lab and lab not in seen:
+        seen.add(lab)
+        model_handles_st.append(h)
+        model_labels_st.append(lab)
+
+ax_stellar.legend(model_handles_st, model_labels_st,
+                  loc="upper right", fontsize=12, frameon=False)
+
 
 plt.tight_layout()
 plt.show()
