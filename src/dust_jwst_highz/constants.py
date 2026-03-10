@@ -15,3 +15,5 @@ kpc = _units.kpc.to("cm")
 L_sun = _const.L_sun.cgs.value
 k_B = _const.k_B.cgs.value  # noqa N816
 h = _const.h.cgs.value
+Myr = _units.Myr.to("s")
+Gyr = _units.Gyr.to("s")

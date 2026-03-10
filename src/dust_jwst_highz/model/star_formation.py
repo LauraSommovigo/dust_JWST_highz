@@ -1,3 +1,5 @@
+from typing import Literal
+
 import astropy.units as apu
 import numpy as np
 from astropy.cosmology import z_at_value
@@ -46,12 +48,52 @@ def halo_to_stellar_mass(
     return epsilon * baryon_fraction * halo_mass * (halo_mass / 1e10) ** alpha
 
 
+def star_formation_rate(
+    halo_mass: float | NDArray[np.floating],
+    redshift: float,
+    epsilon: float,
+    baryon_fraction: float,
+    alpha: float = 0.0,
+    method: Literal["GUREFT", "LS22"] = "GUREFT",
+) -> float | NDArray[np.floating]:
+    """Compute star formation rate from halo accretion.
+
+    Parameters
+    ----------
+    halo_mass : float or ndarray
+        Halo mass in solar masses (M_sun).
+    redshift : float
+        Redshift where the accretion rate is evaluated.
+    epsilon : float
+        Star formation efficiency parameter (dimensionless).
+    baryon_fraction : float
+        Baryon fraction f_b = Omega_b / Omega_m.
+    alpha : float, optional
+        Power-law index for mass-dependent efficiency. Default is 0.0.
+    method : {"GUREFT", "LS22"}, optional
+        Method used for halo mass accretion rate. Default is "GUREFT".
+
+    Returns
+    -------
+    float or ndarray
+        Star formation rate in M_sun/yr.
+
+    """
+    return (
+        epsilon
+        * baryon_fraction
+        * halo_mass_accretion_rate(halo_mass, redshift, method=method)
+        * (halo_mass / 1e10) ** alpha
+    )
+
+
 def star_formation_history(
     halo_mass: float,
     redshift: float,
     time_step: float,
     eps: float,
     alpha: float = 0.0,
+    method: Literal["GUREFT", "LS22"] = "GUREFT",
 ) -> tuple[NDArray[np.floating], NDArray[np.floating], NDArray[np.floating]]:
     """Build star formation history by integrating halo accretion until target stellar mass is reached.
 
@@ -67,6 +109,8 @@ def star_formation_history(
         Star formation efficiency parameter (dimensionless).
     alpha : float, optional
         Power-law index for mass-dependent efficiency. Default is 0.0.
+    method : {"GUREFT", "LS22"}, optional
+        Method used for halo mass accretion rate. Default is "GUREFT".
 
     Returns
     -------
@@ -81,7 +125,7 @@ def star_formation_history(
     Notes
     -----
     This function integrates backwards in time from the given redshift,
-    using the halo mass accretion rate from `dMhdt_GUREFT` to compute
+    using `halo_mass_accretion_rate` (with selected `method`) to compute
     the star formation rate at each step. The integration continues until
     the cumulative stellar mass reaches the target stellar mass computed
     from the halo mass at the final redshift.
@@ -104,7 +148,7 @@ def star_formation_history(
             cosmo.age, (cosmo.age(redshift).value - 1e-3 * time_step * i) * apu.Gyr, method="bounded"
         ).value
         reds_arr.append(reds)
-        sfr_val = eps * fb * halo_mass_accretion_rate(halo_mass, reds, method="GUREFT") * (halo_mass / 1e10) ** alpha
+        sfr_val = star_formation_rate(halo_mass, reds, eps, fb, alpha=alpha, method=method)
         sfh_z.append(sfr_val)
         log_mst.append(np.log10(time_step * 1e6 * np.sum(sfh_z)))
         i += 1

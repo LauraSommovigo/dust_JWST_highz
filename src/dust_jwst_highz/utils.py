@@ -91,3 +91,30 @@ def enforce_monotonic(x_array, y_array, threshold=0.05, direction="increasing", 
         if verbose:
             print("Array is monotonic — no redistribution needed.")
         return x_array, y_array
+
+
+def find_nearest(array: np.ndarray, value: float) -> int:
+    """Find the index of the nearest value in an array.
+
+    Parameters
+    ----------
+    array : array-like
+        Array to search within
+    value : float
+        Target value to find nearest match for
+
+    Returns
+    -------
+    int
+        Index of the element in array closest to value
+
+    Examples
+    --------
+    >>> arr = np.array([1.0, 2.5, 4.0, 5.5])
+    >>> find_nearest(arr, 3.0)
+    1  # closest to 2.5
+
+    """
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return idx
