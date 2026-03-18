@@ -10,7 +10,7 @@ import pandas as pd
 
 @lru_cache(maxsize=8)
 def hirashita19_attenuation_curve(
-    file_path: str | Path = DEFAULT_DATA_DIR / "Hirashita_dense_01Gyr_AttCurve.txt",
+    file_path: str | Path = DEFAULT_DATA_DIR / "Hirashita_dense_01Gyr_AttCurve.csv",
 ) -> interp1d:
     """Load Hirashita+2019 attenuation curve and return interpolation function.
 
@@ -26,10 +26,10 @@ def hirashita19_attenuation_curve(
         Interpolation function for A(λ)/A_V as a function of wavelength in Angstroms.
 
     """
-    data = np.loadtxt(file_path)
+    data = pd.read_csv(file_path)
 
-    wavelength_ang = 1e4 / data[:, 0]  # Convert wavenumber (1/micron) to wavelength (Angstrom)
-    attenuation = data[:, 1]  # A(λ)/A_V
+    wavelength_ang = 1e4 / data["inv_lam_um"].to_numpy()  # Convert wavenumber (1/micron) to wavelength (Angstrom)
+    attenuation = data["A_lam_over_AV"].to_numpy()  # A(λ)/A_V
 
     return interp1d(
         wavelength_ang,

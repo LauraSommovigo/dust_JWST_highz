@@ -741,12 +741,12 @@ def transmission_slab(tau: float, mu: float, omega: float = 0.3807) -> float:
     Parameters
     ----------
     tau : float
-        Optical depth .
+        Optical depth (dimensionless).
     mu : float
         Cosine of the viewing angle relative to the slab normal (dimensionless).
         Must be between 0 and 1, where 1 is face-on and 0 is edge-on.
     omega : float, optional
-        Albedo . Default is 0.3807 for Milky Way dust.
+        Single-scattering albedo (dimensionless). Default is 0.3807 for Milky Way dust.
 
     Returns
     -------
@@ -792,18 +792,18 @@ def transmission_sphere(
     Parameters
     ----------
     tau : float or ndarray
-        Radial optical depth at from the center to the edge of the
+        Radial optical depth from the center to the edge of the
         sphere (dimensionless).
     omega : float, optional
-        Albedo. Default is 0.3807 for Milky Way dust.
+        Single-scattering albedo (dimensionless). Default is 0.3807 for Milky Way dust.
     g : float, optional
-        Scattering asymmetry parameter. Default is 0.6633,
+        Scattering asymmetry parameter (dimensionless). Default is 0.6633,
         indicating forward scattering for Milky Way dust.
 
     Returns
     -------
     float or ndarray
-        Transmission factor, representing the fraction
+        Transmission factor (dimensionless), representing the fraction
         of light that escapes the dusty sphere.
 
     Notes
@@ -870,7 +870,7 @@ def transmission_sphere_mixed(
     return 3.0 / (4.0 * tau) * (1.0 - 1.0 / (2 * tau**2) + (1.0 / tau + 1.0 / (2 * tau**2)) * np.exp(-2.0 * tau))
 
 
-# ? There is probbaly a better place for this function
+# ? There is probably a better place for this function
 def disk_scale_length(
     z: float | NDArray[np.floating],
     halo_mass: float | NDArray[np.floating],
@@ -912,3 +912,167 @@ def disk_scale_length(
 
     """
     return 4.5 * spin * virial_radius(z, halo_mass)
+
+
+def compute_g_lambda(
+    radii_um: NDArray[np.floating],
+    qsca_table: NDArray[np.floating],
+    g_table: NDArray[np.floating],
+    dn_da: NDArray[np.floating],
+) -> NDArray[np.floating]:
+    """Compute scatter-weighted asymmetry parameter g(λ) averaged over grain sizes.
+
+    Parameters
+    ----------
+    radii_um : ndarray, shape (Na,)
+        Grain radii in microns.
+    qsca_table : ndarray, shape (Na, Nλ)
+        Scattering efficiency Q_sca(a, λ).
+    g_table : ndarray, shape (Na, Nλ)
+        Asymmetry parameter for each (a, λ).
+    dn_da : ndarray, shape (Na,)
+        Grain size distribution (any normalization; cancels in ratio).
+
+    Returns
+    -------
+    ndarray, shape (Nλ,)
+        Scatter-weighted asymmetry parameter at each wavelength.
+
+    """
+    a_cm = radii_um * 1e-4
+    da = np.gradient(a_cm)
+    weight = np.pi * a_cm[:, None] ** 2 * qsca_table * dn_da[:, None]
+    num = np.sum(weight * g_table * da[:, None], axis=0)
+    denom = np.sum(weight * da[:, None], axis=0)
+    return num / denom
+
+
+def attenuation_curve_li08(
+    lam_um: NDArray[np.floating],
+    c1: float,
+    c2: float,
+    c3: float,
+    c4: float,
+    model: str | None = None,
+) -> NDArray[np.floating]:
+    """Compute A(λ)/A_V following the Li+2008 parameterization.
+
+    Parameters
+    ----------
+    lam_um : ndarray
+        Wavelength(s) in microns.
+    c1, c2, c3, c4 : float
+        Free parameters controlling the curve shape (ignored when *model*
+        selects a named template).
+    model : str or None
+        Named preset: ``'Calzetti'``, ``'SMC'``, ``'MW'``, or ``'LMC'``.
+        If ``None`` (default), the supplied c1–c4 values are used directly.
+
+    Returns
+    -------
+    ndarray
+        A(λ)/A_V at each input wavelength.
+
+    References
+    ----------
+    Li, A. & Draine, B. T. 2008
+
+    """
+    presets = {
+        "Calzetti": (44.9, 7.56, 61.2, 0.0),
+        "SMC": (38.7, 3.83, 6.34, 0.0),
+        "MW": (14.4, 6.52, 2.04, 0.0519),
+        "LMC": (4.47, 2.39, -0.988, 0.0221),
+    }
+    if model in presets:
+        c1, c2, c3, c4 = presets[model]
+
+    lam_um = np.asarray(lam_um, dtype=float)
+    return (
+        c1 / ((lam_um / 0.08) ** c2 + (lam_um / 0.08) ** -c2 + c3)
+        + (233.0 * (1.0 - c1 / (6.88**c2 + 0.145**c2 + c3) - c4 / 4.6))
+        / ((lam_um / 0.046) ** 2.0 + (lam_um / 0.046) ** -2.0 + 90.0)
+        + c4 / ((lam_um / 0.2175) ** 2.0 + (lam_um / 0.2175) ** -2.0 - 1.95)
+    )
+
+
+def attenuation_curve_rt(
+    kappa_ext: NDArray[np.floating],
+    omega_lam: NDArray[np.floating],
+    g_lam: NDArray[np.floating],
+    sigmad: float,
+    geometry: str = "sphere_central",
+    mu: float = 0.6,
+) -> NDArray[np.floating]:
+    """Compute A(λ) [mag] for a given dust column and RT geometry.
+
+    Parameters
+    ----------
+    kappa_ext : ndarray, shape (Nλ,)
+        Total extinction opacity [cm² g⁻¹].
+    omega_lam : ndarray, shape (Nλ,)
+        Single-scattering albedo.
+    g_lam : ndarray, shape (Nλ,)
+        Henyey-Greenstein asymmetry parameter.
+    sigmad : float
+        Dust surface density [g cm⁻²].
+    geometry : str
+        One of ``'sphere_central'``, ``'sphere_mixed'``, or ``'slab'``.
+    mu : float
+        Cosine of inclination angle (only used for ``geometry='slab'``).
+
+    Returns
+    -------
+    ndarray
+        Attenuation A(λ) in magnitudes.
+
+    """
+    tau = kappa_ext * sigmad
+
+    if geometry == "sphere_central":
+        t_lam = transmission_sphere(tau, omega_lam, g_lam)
+    elif geometry == "sphere_mixed":
+        t_lam = transmission_sphere_mixed(tau)
+    elif geometry == "slab":
+        t_lam = transmission_slab(tau, mu=mu, omega=omega_lam)
+    else:
+        raise ValueError(f"Unknown geometry '{geometry}'. Choose 'sphere_central', 'sphere_mixed', or 'slab'.")
+
+    return -2.5 * np.log10(t_lam)
+
+
+def attenuation_curve_sommovigo25(
+    lam_um: NDArray[np.floating],
+    a_v: float,
+) -> NDArray[np.floating]:
+    """Parametric attenuation curve from Sommovigo+2025 (TNG+RT calibration).
+
+    Uses a modified Li+2008 functional form with A_V-dependent coefficients
+    calibrated against TNG cosmological simulations with radiative transfer.
+
+    Parameters
+    ----------
+    lam_um : ndarray
+        Wavelengths in microns.
+    a_v : float
+        V-band attenuation A_V [mag].
+
+    Returns
+    -------
+    ndarray
+        A(λ)/A_V at each input wavelength.
+
+    References
+    ----------
+    Sommovigo et al. 2025
+
+    """
+    log_av = np.log10(a_v)
+    log_c1 = -0.37 * log_av + 0.75
+    c1 = 10.0**log_c1
+    c2 = 1.88
+    c3 = 1.21 * log_c1 - 1.33
+    log_c4 = -0.59 * log_av - 1.42
+    c4 = 10.0**log_c4
+
+    return attenuation_curve_li08(lam_um, c1, c2, c3, c4)

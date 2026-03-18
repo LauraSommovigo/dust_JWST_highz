@@ -141,7 +141,7 @@ def plot_lf_data(z, ax, data_dir=None, style_overrides=None):
     """
     # Setup data directory
     if data_dir is None:
-        data_dir = Path(__file__).parent.parent / "data"
+        data_dir = Path(__file__).parent.parent.parent / "data"
     else:
         data_dir = Path(data_dir)
 
@@ -256,20 +256,15 @@ def plot_lf_data(z, ax, data_dir=None, style_overrides=None):
                         alpha=alpha,
                     )
 
-    # ===== z < 10: Bouwens+21 (from text file) =====
+    # ===== z < 10: Bouwens+21 (from CSV file) =====
     if z < 10:
-        obs_data = np.genfromtxt(
-            data_dir / "Bouwens21_z2-9.txt",
-            names=True,
-            dtype=None,
-            encoding=None,
-        )
+        obs_data = pd.read_csv(data_dir / "Bouwens21_z2-9.csv")
 
-        mask = obs_data["Redshift"] == z
-        m_uv = np.array([float(x) if x != "nan" else np.nan for x in obs_data["MUV"][mask]], dtype=float)
-        phi = np.array([float(x) if x != "nan" else np.nan for x in obs_data["Phi"][mask]], dtype=float)
-        err_phi_low = np.array([float(x) if x != "nan" else np.nan for x in obs_data["Err_Phi_low"][mask]], dtype=float)
-        err_phi_up = np.array([float(x) if x != "nan" else np.nan for x in obs_data["Err_Phi_up"][mask]], dtype=float)
+        mask = obs_data["redshift"] == z
+        m_uv = obs_data["MUV"][mask].to_numpy(dtype=float)
+        phi = obs_data["phi"][mask].to_numpy(dtype=float)
+        err_phi_low = obs_data["err_phi_low"][mask].to_numpy(dtype=float)
+        err_phi_up = obs_data["err_phi_up"][mask].to_numpy(dtype=float)
 
         # Identify upper limits: missing or huge upper error
         is_upper_limit = np.isnan(err_phi_up) | (err_phi_up > phi)
