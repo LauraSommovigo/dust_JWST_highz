@@ -20,6 +20,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "jupyter>=1.1.1",
+    "jupytext>=1.19.1",
     "pre-commit>=4.3.0",
     "ruff>=0.14.2",
 ]

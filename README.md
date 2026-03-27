@@ -54,8 +54,24 @@ Current paper draft: https://www.overleaf.com/read/rsnzrzvdkyvm#bbf2a2
 uv sync --group dev
 ```
 
+## Running the Analysis
+
+The main analysis lives in `notebooks/main.py` (kept in sync with `notebooks/main.ipynb` via jupytext).
+
+**Important:** the notebook has a two-step dependency. The grain-size distribution section must be run first — it computes dust opacity constants and saves them to `data/dust_constants.txt`. Subsequent sections (optical depth, attenuation, LF figures) load constants from that file. If `dust_constants.txt` is missing you will get a `FileNotFoundError` with a reminder to run the grain-size section first.
+
+To run the full script end-to-end from the project root:
+
+```bash
+uv run python notebooks/main.py
+```
+
+Or open `notebooks/main.ipynb` in VS Code / JupyterLab and run all cells in order.
+
+Figure outputs are saved under `outputs/z{redshift}/`.
 
 ## Notes
 
 - The project requires Python 3.11+.
 - Data files previously stored as plain text tables have been migrated to CSV for consistency.
+- `data/dust_constants.txt` is a generated file — do not edit by hand.
