@@ -43,9 +43,11 @@ from dust_jwst_highz.model.dust import (
     compute_g_lambda,
     compute_mdust_steps,
     disk_scale_length,
+    dust_temp_from_lir,
     grain_size_dist,
     kappa_lambda,
     optical_depth,
+    seedavg_lir,
     small_carbonaceous_grain_dist,
     stellar_grain_size_dist,
     transmission_sphere,
@@ -56,6 +58,7 @@ from dust_jwst_highz.model.ism import density_compression_ratio, lognormal_varia
 from dust_jwst_highz.model.luminosity import (
     compute_dotnion_steps,
     compute_l1500_steps,
+    greybody_fnu,
     l1500_lambda_to_lnu,
     l1500_to_muv_conv,
 )
@@ -396,7 +399,7 @@ def props_path(
 # Model parameters
 
 
-redshift = 7  # Target redshift
+redshift = 7  # Target redshift (7,10,14)
 OUTPUT_DIR = (OUTPUT_DIR / f"z{int(redshift)}").resolve()
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 Mh_array = np.logspace(8, 12, 8)  # Halo mass range (same as Yung+23)
@@ -1179,7 +1182,7 @@ def plot_family(
     color: str,
     title: str,
 ) -> None:
-    """Plot PS, mixed, Sommovigo+24 for A_V = 0.1 and 1.0.
+    """Plot PS, mixed, Sommovigo+25 for A_V = 0.1 and 1.0.
 
     Uses the given dust model (kappa_ext_tot, omega_tot, g_tot).
     """
@@ -1231,7 +1234,7 @@ def plot_family(
             lam_ang, a_norm_mix, color=shade_mix, lw=1.1 * lw, ls=ls_map[av], alpha=0.7, label=label_mix, zorder=1000
         )
 
-        # --- Sommovigo+24 model ---
+        # --- Sommovigo+25 model ---
         # attenuation_curve_sommovigo25 returns A_lambda/A_V for a given A_V
         # Use lam_ang (ascending) converted to µm — lam_um is descending and would mirror the curve
         a_norm_s24 = attenuation_curve_sommovigo25(lam_ang * 1e-4, av)
@@ -1337,12 +1340,12 @@ plt.show()
 # %%
 arr_e = np.array([0.1])
 arr_yd = np.array([0.001, 0.01, 0.1])
-fig, ax = plt.subplots(figsize=(9, 7))
+fig, ax = plt.subplots(figsize=(10, 7))
 
 point_colormap = custom_colormap
 line_colormap = truncate_colormap(plt.cm.inferno, 0.0, 0.7)
 
-_Mh_fig5 = np.logspace(8, 13, 12)  # extended halo mass range for fig5 model curves
+_Mh_fig5 = np.logspace(8, 13, 18)  # extended halo mass range for fig5 model curves
 
 for eps in arr_e:
     Mstar_array = halo_to_stellar_mass(_Mh_fig5, fb, eps)
@@ -1486,14 +1489,20 @@ elif redshift == 7:
     _obs_muv5 = rebels["MUV"].dropna().values
 else:
     _obs_muv5 = muv_intr_array
-ax.set_ylim(max(np.nanmax(_obs_muv5) + 2, -16), min(np.nanmin(_obs_muv5) - 2, np.nanmin(muv_intr_array) - 1))
+if redshift >= 10:
+    ax.set_ylim(-15.2, -22.5)
+else:
+    ax.set_ylim(max(np.nanmax(_obs_muv5) + 2, -16), min(np.nanmin(_obs_muv5) - 2, np.nanmin(muv_intr_array) - 1))
 if redshift >= 10:
     _obs_ms5 = jwst_plot["log_Mstar"].dropna().values
 elif redshift == 7:
     _obs_ms5 = rebels["log_Mstar"].dropna().values
 else:
     _obs_ms5 = np.log10(Mstar_array)
-ax.set_xlim(_obs_ms5.min() - 1, min(_obs_ms5.max() + 2, 11.0))
+if redshift >= 10:
+    ax.set_xlim(_obs_ms5.min() - 1, 9.9)
+else:
+    ax.set_xlim(_obs_ms5.min() - 1, min(_obs_ms5.max() + 2, 11.0))
 
 # Inline geometry labels at log10(Mstar) = 9, inclined along each curve
 fig.canvas.draw()
@@ -1503,7 +1512,7 @@ _di = max(2, len(Mstar_array) // 10)
 _i1 = max(0, _i9 - _di)
 _i2 = min(len(Mstar_array) - 1, _i9 + _di)
 for _arr, _col, _lbl, _angle_scale, _offset in [
-    (muv_att_mix, line_color, r"Mix $T_{\rm 1500,mix}$", 1.0, 0.9),
+    (muv_att_mix, line_color, r"Mix $T_{\rm 1500,mix}$", 1.0, 0.55),
     (muv_att_ps, "magenta", r"Point Source $T_{\rm 1500,ps}$", 0.4, 0.55),
 ]:
     _p1 = ax.transData.transform((_x_data[_i1], _arr[_i1]))
@@ -1573,20 +1582,25 @@ def get_muv_clumpy(
     return -2.5 * np.log10(luv_draws) + 51.60  # MUV_att draws
 
 # %%
-log_mh = 11.6  # 10.9
+# --- Fig 6: fixed single-galaxy parameters (independent of global loop values) ---
+_log_mh_6 = 10.86
+_epsilon_6 = 0.1   # star-formation efficiency for this representative galaxy
+_yd_6      = 0.1   # dust yield per SN [Msun/SN]
+print(f"Fig 6 parameters: log_mh={_log_mh_6}, epsilon={_epsilon_6}, yd={_yd_6}, redshift={redshift}")
+
 col_f = plt.colormaps["gray"]
 
 np.random.seed(42)
 
 # Stellar mass from halo mass
-Mstar_array = halo_to_stellar_mass(10**log_mh, fb, epsilon)
+Mstar_array = halo_to_stellar_mass(10**_log_mh_6, fb, _epsilon_6)
 
 # Build SFH
 len_sp_dis = 1000
 spin_param_distr = np.random.lognormal(mean=np.log(10**-1.5677), sigma=0.5390, size=len_sp_dis)
-sfh, log_mst_build, age = star_formation_history(10**log_mh, redshift, tstep, epsilon)
+sfh, log_mst_build, age = star_formation_history(10**_log_mh_6, redshift, tstep, _epsilon_6)
 
-n_sn_arr, md_arr = compute_mdust_steps(age, tstep, sfh, time_yr, log_snr_yr, yd)
+n_sn_arr, md_arr = compute_mdust_steps(age, tstep, sfh, time_yr, log_snr_yr, _yd_6)
 
 # Compute 1500A luminosity [erg/s/Hz]
 l1500_arr = compute_l1500_steps(l1500_sb99, age, tstep, sfh, time_yr_l1500, method="SB99")
@@ -1603,7 +1617,7 @@ print("log Mdust/Msun -->", np.log10(M_dust))
 print("log Mstar/Msun -->", np.log10(Mstar_array))
 
 # Median sigma_d for uniform distribution [g/cm^2]
-tau_uv_arr = optical_depth(kuv, M_dust, 10**log_mh, spin_param_distr, redshift)
+tau_uv_arr = optical_depth(kuv, M_dust, 10**_log_mh_6, spin_param_distr, redshift)
 Sigmad_arr = tau_uv_arr / kuv  # g/cm^2
 
 # Log-normal draw for sigma_d, width set by Mach number
@@ -1766,6 +1780,137 @@ ax[1].legend(frameon=False, fontsize=14, loc="upper left")
 print("\n\n Saving fig6_muv_pdf_clumpy.pdf")
 fig.savefig(OUTPUT_DIR / "fig6_muv_pdf_clumpy.pdf", bbox_inches="tight")
 plt.show()
+
+# %% [markdown]
+# ## Figure 10: Greybody FIR SED — T_dust, CMB correction, observational constraints
+#
+# For a representative halo (log Mh = 11.6), compute L_IR from the turbulent lognormal
+# Σ_d model (seed-averaged absorbed fraction, GL quadrature), invert the single-temperature
+# greybody to get T_dust, and plot the predicted observed-frame SED F_ν(λ_obs).
+#
+# Key physics:
+# - CMB correction (da Cunha+13): T_CMB = 2.73*(1+z) sets a floor on T_dust and
+#   reduces the observable flux contrast against the CMB background
+# - κ_158(MW) > κ_158(stellar): MW dust predicts cooler T_d at fixed L_IR/M_d
+# - β_d = 2.03 (Draine+03 silicates)
+#
+# Data:
+# - z=7:  REBELS detections at 158 µm (Inami+22), colour-coded by stellar mass
+# - z=10: ALMA and NOEMA upper limits (GNz11, GHZ2, GSz140), see (Fudamoto et al. 2023; Schouws et al. 2024; Bakx et al. 2022; see also Carniani et al. 2024; Popping 2022)
+#
+# Runs at redshift == 7 or redshift == 10.
+
+# %%
+if redshift in (7, 10):
+    # ── Colour normalisation — same as fig3 (tau_v plot) ─────────────────────
+    # Recompute over the full Mh_array: Mstar_array has been overwritten with a
+    # single-halo scalar by this point, so min() == max() gives wrong colours.
+    _mstar_range = np.log10(halo_to_stellar_mass(Mh_array, fb, epsilon))
+    _mstar_lo = _mstar_range.min()
+    _mstar_hi = _mstar_range.max()
+    def _sed_col(log_mstar):
+        return custom_colormap((log_mstar - _mstar_lo) / (_mstar_hi - _mstar_lo))
+
+    # ── Representative halo — match reference: 11.6 at z=7, 10.86 at z≥10 ──
+    _log_mh_sed = 11.6 if redshift == 7 else 10.86
+    _mh_sed = 10**_log_mh_sed
+    _sfh_sed, _, _age_sed = star_formation_history(_mh_sed, redshift, tstep, epsilon)
+    _l1500_sed = compute_l1500_steps(l1500_sb99, _age_sed, tstep, _sfh_sed, time_yr_l1500)[-1]
+    _, _md_arr_sed = compute_mdust_steps(_age_sed, tstep, _sfh_sed, time_yr, log_snr_yr, yd)
+    _mdust_sed = _md_arr_sed[-1]
+    _spin_sed = np.random.lognormal(mean=np.log(10**-1.5677), sigma=0.5390, size=1000)
+    _tau_sed = optical_depth(kuv, _mdust_sed, _mh_sed, _spin_sed, redshift)
+    _sigmad_sed = _tau_sed / kuv
+    print(f"SED halo: log Mh={_log_mh_sed}, log Mdust={np.log10(_mdust_sed):.2f}")
+
+    # ── Dust model configurations ─────────────────────────────────────────────
+    _sed_models = [
+        {"name": "MW dust (WD01)",     "color": "crimson", "kUV_abs": kuv_drn_abs, "kIR": kir_drn},
+        {"name": "Stellar dust (H19)", "color": "teal",    "kUV_abs": kuv_hir_abs, "kIR": kir_hir},
+    ]
+    _mach_sed = [10, 100]
+    _ls_mach  = {10: "-", 100: "--"}
+
+    lam_obs_um  = np.logspace(2, 4, 2000)
+    lam_rest_um = lam_obs_um / (1.0 + redshift)
+    lam_rest_cm = lam_rest_um * 1e-4
+
+    # ── REBELS 158 µm detections (Sommovigo+22,Inami+22) ───────────────────────────────
+    _reb_mstar = np.array([10.09, 9.56, 9.94, 9.22, 9.82, 9.38, 10.27,
+                            10.16, 10.04, 9.78, 10.37, 9.24, 9.82])
+    _reb_z     = np.array([6.496, 6.749, 7.346, 7.084, 7.675, 7.370, 7.307,
+                            7.090, 6.685, 6.729, 6.577, 6.845, 7.365])
+    _reb_flux  = np.array([67.23, 101.44, 86.78, 59.99, 52.87, 71.15, 259.55,
+                            50.59, 56.08, 60.38, 163.00, 79.74, 48.28])
+    _reb_eflux = np.array([13., 20., 24., 15., 10., 20., 22., 10., 13., 17., 23., 16., 13.])
+
+    _yr_sed   = [0.8, 2.45] if redshift == 7 else [-0.7, 1.8]
+    _band_bot = _yr_sed[0] + 0.05
+    _band_lbl = _yr_sed[0] + 0.25
+
+    fig10, ax10 = plt.subplots(figsize=(7.5, 5.5))
+
+    for _mod in _sed_models:
+        for _mach in _mach_sed:
+            _lir = seedavg_lir(_mod["kUV_abs"], _mach, _sigmad_sed, _l1500_sed)
+            _td  = dust_temp_from_lir(_lir, _mdust_sed, _mod["kIR"])
+            print(f'{_mod["name"]}, M={_mach}: log(LIR/Lsun)={np.log10(_lir / const.L_sun):.2f}, Td={_td:.1f} K')
+            _fnu = greybody_fnu(lam_rest_cm, _td, np.log10(_mdust_sed), redshift, _mod["kIR"])
+            ax10.plot(np.log10(lam_obs_um), np.log10(_fnu),
+                      color=_mod["color"], ls=_ls_mach[_mach], lw=2.2, alpha=0.75,
+                      label=fr'{_mod["name"]}, $\mathcal{{M}}$={_mach} ($T_d$={_td:.0f} K)')
+
+    # Overplot observational constraints — same colour normalisation as fig3
+    if redshift == 7:
+        for jj in range(len(_reb_z)):
+            _fo, _dfo = _reb_flux[jj], _reb_eflux[jj]
+            ax10.errorbar(
+                np.log10(158.0 * _reb_z[jj]), np.log10(_fo),
+                yerr=[[np.log10(_fo / max(_fo - _dfo, 1e-3))], [np.log10((_fo + _dfo) / _fo)]],
+                ms=9, marker="s", capsize=2.5, mec="black", elinewidth=0.5,
+                color=_sed_col(_reb_mstar[jj]), mew=0.3, alpha=0.85,
+                label="REBELS (Inami+22)" if jj == 0 else None,
+            )
+    else:
+        _uplim_mask = (jwst["IR_Flux"] > 0) & (jwst["lambda_obs"] > 0)
+        _jw_ul = jwst[_uplim_mask]
+        for _idx, _row in _jw_ul.iterrows():
+            _lam_obs_jw = np.log10(_row["lambda_obs"] * (1.0 + _row["redshift"]))
+            ax10.errorbar(
+                _lam_obs_jw, np.log10(_row["IR_Flux"]),
+                yerr=0.3, uplims=True,
+                ms=9, marker="h", capsize=3, mec="black", elinewidth=0.8,
+                color=_sed_col(_row["log_Mstar"]), mew=0.4, alpha=0.85,
+                label="ALMA upper limits" if _idx == _jw_ul.index[0] else None,
+            )
+            ax10.text(_lam_obs_jw + 0.02, np.log10(_row["IR_Flux"]) + 0.05,
+                      _row["name"], fontsize=9, color=_sed_col(_row["log_Mstar"]))
+
+    _magma = plt.cm.magma(np.linspace(0.2, 0.8, 4))
+    for _lo, _hi, _col, _lab in [
+        (1.1e3, 1.4e3, _magma[0], "6"),
+        (0.8e3, 1.1e3, _magma[1], "7"),
+        (0.6e3, 0.8e3, _magma[2], "8"),
+        (0.4e3, 0.5e3, _magma[3], "9"),
+    ]:
+        ax10.fill_betweenx(_yr_sed, np.log10(_lo), np.log10(_hi), color=_col, alpha=0.12, zorder=-100)
+        ax10.text(np.log10(0.5 * (_lo + _hi)), _band_bot, _lab,
+                  fontsize=13, color=_col, alpha=0.6, ha="center")
+    ax10.text(np.log10(0.78e3), _band_lbl, "ALMA Bands", fontsize=13, alpha=0.3, ha="center")
+
+    ax10.set_xlim(2.0, 3.35)
+    ax10.set_ylim(*_yr_sed)
+    ax10.set_xlabel(r"$\log\,(\lambda_{\rm obs}/\mu{\rm m})$", fontsize=14)
+    ax10.set_ylabel(r"$\log\,(F_\nu/\mu{\rm Jy})$", fontsize=14)
+    ax10.legend(frameon=False, fontsize=10, loc="upper left")
+    ax10.set_title(rf"Greybody SED at $z={redshift}$ — MW and stellar dust", fontsize=13)
+    plt.tight_layout()
+    _sed_fname = f"fig10_greybody_sed_z{redshift}.pdf"
+    print(f"\n\n Saving {_sed_fname}")
+    fig10.savefig(OUTPUT_DIR / _sed_fname, bbox_inches="tight")
+    plt.show()
+
+
 
 # %% [markdown]
 # ## Figures 7-10
@@ -2492,7 +2637,6 @@ for _kuv_lf9, _kuv_abs_lf9, _dust_label, _fig9_fname in [
     print(f"\n\n Saving {_fig9_fname}")
     fig.savefig(OUTPUT_DIR / _fig9_fname, bbox_inches="tight")
     plt.show()
-
 
 
 # %% [markdown]

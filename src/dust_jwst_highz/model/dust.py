@@ -540,9 +540,9 @@ def dust_temp_cmb_corrected(
 
     """
     exponent = 4.0 + emissivity
-    tcmb_z = cosmo.Tcmb(redshift).value  # CMB temperature at redshift z [K]
+    tcmb_0 = cosmo.Tcmb(0).value  # CMB temperature today [K] (da Cunha+13 eq. 9)
 
-    temp_corrected = (dust_temp**exponent + tcmb_z**exponent * ((1.0 + redshift) ** exponent - 1.0)) ** (1.0 / exponent)
+    temp_corrected = (dust_temp**exponent + tcmb_0**exponent * ((1.0 + redshift) ** exponent - 1.0)) ** (1.0 / exponent)
 
     return temp_corrected
 
@@ -1076,3 +1076,142 @@ def attenuation_curve_sommovigo25(
     c4 = 10.0**log_c4
 
     return attenuation_curve_li08(lam_um, c1, c2, c3, c4)
+
+
+def greybody_dust_temp(
+    log_mdust: float | NDArray[np.floating],
+    log_ldust: float | NDArray[np.floating],
+    kabs_158: float,
+    emissivity: float = 2.03,
+) -> float | NDArray[np.floating]:
+    """Compute single-temperature greybody T_dust from luminosity and mass.
+
+    Inverts the modified blackbody integral:
+
+      L_IR = M_d * kappa_158 * (8π/c²) * (ν_0^{-β}) *
+             (k_B/h)^{4+β} * Γ(4+β) * ζ(4+β) * T_d^{4+β}
+
+    Parameters
+    ----------
+    log_mdust : float or ndarray
+        log10(M_dust / M_sun).
+    log_ldust : float or ndarray
+        log10(L_IR / L_sun).
+    kabs_158 : float
+        Dust absorption opacity at 158 µm [cm² g⁻¹].
+    emissivity : float, optional
+        Dust emissivity index β. Default 2.03 (Draine+03 silicates).
+
+    Returns
+    -------
+    float or ndarray
+        Dust temperature T_d [K].
+
+    References
+    ----------
+    Sommovigo et al. (2022), Draine (2003).
+
+    """
+    import scipy.special
+
+    nu_158 = const.c * 1e4 / 158.0  # Hz
+    teta = (
+        (8.0 * np.pi / const.c**2)
+        * (kabs_158 / nu_158**emissivity)
+        * (const.k_B**(4.0 + emissivity) / const.h**(3.0 + emissivity))
+        * scipy.special.zeta(4.0 + emissivity)
+        * scipy.special.gamma(4.0 + emissivity)
+    )
+    log_td = (
+        log_ldust - log_mdust - np.log10(teta) - np.log10(const.M_sun / const.L_sun)
+    ) / (4.0 + emissivity)
+    return 10.0**log_td
+
+
+def dust_temp_from_lir(
+    l_ir: float | NDArray[np.floating],
+    m_dust: float | NDArray[np.floating],
+    kabs_158: float,
+    emissivity: float = 2.03,
+) -> float | NDArray[np.floating]:
+    """Wrapper: L_IR [erg/s] + M_dust [M_sun] → T_dust [K] via greybody inversion.
+
+    Parameters
+    ----------
+    l_ir : float or ndarray
+        Bolometric IR luminosity [erg/s].
+    m_dust : float or ndarray
+        Dust mass [M_sun].
+    kabs_158 : float
+        Dust absorption opacity at 158 µm [cm² g⁻¹].
+    emissivity : float, optional
+        Dust emissivity index β. Default 2.03.
+
+    Returns
+    -------
+    float or ndarray
+        Dust temperature T_d [K].
+
+    """
+    return greybody_dust_temp(
+        np.log10(m_dust),
+        np.log10(l_ir / const.L_sun),
+        kabs_158,
+        emissivity,
+    )
+
+
+def seedavg_lir(
+    kabs_uv: float,
+    mach: float,
+    sigmad_arr: NDArray[np.floating],
+    l_intr: float,
+    k_spins: int = 13,
+    k_gl: int = 24,
+) -> float:
+    """Seed-averaged IR luminosity from a turbulent lognormal Σ_d model.
+
+    Mirrors the turbulent LF logic: draw K_SPINS quantile seeds from the
+    spin-parameter Σ_d distribution, then integrate the absorbed fraction
+    over a lognormal whose width is set by the Mach number.
+
+    Parameters
+    ----------
+    kabs_uv : float
+        Dust absorption opacity at 1500 Å [cm² g⁻¹].
+    mach : float
+        Turbulent Mach number (must be > 0).
+    sigmad_arr : ndarray
+        Dust surface density samples from the spin distribution [g cm⁻²].
+    l_intr : float
+        Intrinsic UV luminosity L_1500 [erg s⁻¹ Hz⁻¹].
+    k_spins : int, optional
+        Number of quantile seeds for the spin distribution. Default 13.
+    k_gl : int, optional
+        Number of Gauss–Legendre nodes for the Σ_d integral. Default 24.
+
+    Returns
+    -------
+    float
+        Bolometric IR luminosity L_IR [erg/s],
+        L_IR ≈ L_1500 × f_abs × (c / λ_1500).
+
+    """
+    from scipy.stats import norm
+    from .ism import lognormal_variance_from_mach
+
+    u_l = (np.arange(1, k_spins // 2 + 1) - 0.5) / k_spins
+    u_seeds = np.concatenate([u_l, [0.5], 1.0 - u_l[::-1]])
+    mu_seeds = np.quantile(sigmad_arr, u_seeds)
+
+    sig_ln = lognormal_variance_from_mach(mach)
+    xu, wu = np.polynomial.legendre.leggauss(k_gl)
+    u_n = np.clip(0.5 * (xu + 1.0), 1e-12, 1 - 1e-12)
+    w_n = 0.5 * wu
+    z_n = norm.ppf(u_n)
+
+    x_n = np.exp(np.log(mu_seeds)[:, None] + sig_ln * z_n[None, :])
+    a_n = 1.0 - transmission_sphere_mixed(kabs_uv * x_n)
+    f_abs = np.sum(w_n[None, :] * a_n, axis=1).mean()
+
+    return l_intr * f_abs * (const.c / 1500e-8)
