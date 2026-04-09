@@ -1,9 +1,9 @@
 # UV Luminosity Function Observational Data
-# Format: redshift, source, muv, phi, phi_err_low, phi_err_up, is_upper_limit
+# Format: redshift ; source ; muv ; phi ; phi_err_low ; phi_err_up ; is_upper_limit
 # phi and errors in units of Mpc^-3 mag^-1
-# is_upper_limit: 0=detection, 1=upper limit
+# is_upper_limit: 0=detection ; 1=upper limit
 #
-# References by source (DOI where available, arXiv otherwise):
+# References by source (DOI where available ; arXiv otherwise):
 #   Harikane23: DOI: 10.3847/1538-4357/ad0b7e
 #   Donnan24: arXiv: 2403.03171
 #   McLeod23: DOI: 10.1093/mnras/stad3471
