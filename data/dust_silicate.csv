@@ -1,7 +1,7 @@
-# Astronomical silicate, smoothed UV
-# radius[micron]
-# wavelength[micron]
-# g =<cos>
+# Astronomical silicate grain optical properties, smoothed UV
+# Source: Draine (2003), ARA&A, 41, 241 — DOI: 10.1146/annurev.astro.41.011802.094840
+# Downloaded from: https://www.astro.princeton.edu/~draine/dust/dust.diel.html
+# radius [micron], wavelength [micron], g = <cos(theta)>
 radius,wavelength,Q_abs,Q_sca,g
 1.000e-03,1.000e+03,1.380e-07,2.525e-21,0.000e+00
 1.000e-03,9.441e+02,1.548e-07,3.179e-21,0.000e+00

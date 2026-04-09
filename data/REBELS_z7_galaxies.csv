@@ -1,5 +1,8 @@
 # REBELS z=7 galaxy properties
-# Source: Sommovigo+22b (Av, logMstar, Age), Stefanon in prep. (logMd)
+# Survey: Bouwens et al. (2022), ApJ, 931, 160 — DOI: 10.3847/1538-4357/ac5a4a
+# logMd: Sommovigo et al. (2022a), MNRAS, 513, 3122 — DOI: 10.1093/mnras/stac302
+# logMstar, sSFR, Age: Topping et al. (2022), MNRAS, 516, 975 — DOI: 10.1093/mnras/stac2291
+#                       Stefanon et al. (in prep.)
 # Av = 1.086 * tau_V (npSFH fit); err_Av_high uses factor 1.86
 # age_Gyr: stellar population age in Gyr
 id,MUV,Av,err_Av_low,err_Av_high,log_Mstar,err_log_Mstar_low,err_log_Mstar_high,log_Md,err_log_Md_low,err_log_Md_high,age_Gyr,err_age_low_Gyr,err_age_high_Gyr

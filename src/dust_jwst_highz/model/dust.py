@@ -441,63 +441,6 @@ def mass_weighted_grain_size_dist(
     return grain_size_dist(radius, **gsd_kwargs) * grain_mass(radius, **gm_kwargs)
 
 
-def normed_number_weighted_grain_dist(radius: NDArray[np.floating], **kwargs) -> NDArray[np.floating]:
-    """Return normalized number-weighted grain distribution in bins of radius.
-
-    Parameters
-    ----------
-    radius : ndarray
-        Array of grain radius bin edges in cm. Must have at least 2 elements.
-    **kwargs : dict
-        Additional keyword arguments passed to `grain_size_dist`.
-
-    Returns
-    -------
-    ndarray
-        Normalized number-weighted grain distribution with length len(radius) - 1.
-        Each element represents the fraction of grains in the corresponding size bin.
-
-    Notes
-    -----
-    The distribution is computed by integrating `grain_size_dist` over each bin and then
-    normalizing so that the sum equals 1.
-
-    """
-    weights = np.zeros(len(radius) - 1)
-    for s in range(1, len(radius)):
-        weights[s - 1] = quad(partial(grain_size_dist, **kwargs), radius[s - 1], radius[s])[0]
-    return weights / np.sum(weights)
-
-
-def normed_mass_weighted_grain_size_dist(radius: NDArray[np.floating], **kwargs) -> NDArray[np.floating]:
-    """Return normalized mass-weighted grain distribution in bins of radius.
-
-    Parameters
-    ----------
-    radius : ndarray
-        Array of grain size bin edges in cm. Must have at least 2 elements.
-    **kwargs : dict
-        Additional keyword arguments passed to `grain_size_dist`.
-
-    Returns
-    -------
-    ndarray
-        Normalized mass-weighted grain distribution with length len(a) - 1.
-        Each element represents the mass fraction of grains in the corresponding size bin.
-
-    Notes
-    -----
-    The distribution is computed by integrating dn_da_massg over each bin and then
-    normalizing so that the sum equals 1. This gives the mass fraction in each bin
-    rather than the number fraction.
-
-    """
-    weights = np.zeros(len(radius) - 1)
-    for s in range(1, len(radius)):
-        weights[s - 1] = quad(partial(mass_weighted_grain_size_dist, **kwargs), radius[s - 1], radius[s])[0]
-    return weights / np.sum(weights)
-
-
 def dust_temp_cmb_corrected(
     dust_temp: float | NDArray[np.floating],
     redshift: float,

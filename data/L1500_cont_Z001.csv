@@ -1,3 +1,8 @@
+# UV luminosity at 1500 A for continuous SFR, Z=0.01
+# Source: Starburst99 — Leitherer et al. (1999), ApJS, 123, 3
+# DOI: 10.1086/313233
+# Website: https://www.stsci.edu/science/starburst99/
+# Columns: time_yr, log_l1500 [erg/s/Hz], log_l1500_2, log_l1500_3
 time_yr,log_l1500,log_l1500_2,log_l1500_3
 9.9999997e-06,38.238,37.387,37.876
 100000.0,38.541,37.689,38.178

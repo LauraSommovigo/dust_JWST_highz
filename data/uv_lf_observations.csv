@@ -3,13 +3,14 @@
 # phi and errors in units of Mpc^-3 mag^-1
 # is_upper_limit: 0=detection, 1=upper limit
 #
-# References by source:
-#   Harikane23: https://doi.org/10.3847/1538-4357/ad0b7e
-#   Donnan24: https://arxiv.org/pdf/2403.03171
-#   McLeod23: https://arxiv.org/abs/2304.14469
-#   Leung23: https://arxiv.org/abs/2306.06244
-#   CEERS_Finkelstein23: https://arxiv.org/abs/2311.04279
-#   Oesch18: Oesch et al. 2018 (pre-JWST)
+# References by source (DOI where available, arXiv otherwise):
+#   Harikane23: DOI: 10.3847/1538-4357/ad0b7e
+#   Donnan24: arXiv: 2403.03171
+#   McLeod23: DOI: 10.1093/mnras/stad3471
+#   Leung23: arXiv: 2306.06244
+#   CEERS_Finkelstein23: arXiv: 2311.04279
+#   Oesch18: DOI: 10.3847/1538-4357/aab03f
+#   Whitler25: DOI: 10.3847/1538-4357/adfddc
 redshift,source,muv,phi,phi_err_low,phi_err_up,is_upper_limit
 10,Harikane23,-21.03,4.00e-5,3.85e-5,9.42e-5,0
 10,Harikane23,-20.03,4.08e-5,3.92e-5,9.60e-5,0

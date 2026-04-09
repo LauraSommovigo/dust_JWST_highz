@@ -1,3 +1,8 @@
+# Supernova rate for instantaneous burst, Z=0.01
+# Source: Starburst99 — Leitherer et al. (1999), ApJS, 123, 3
+# DOI: 10.1086/313233
+# Website: https://www.stsci.edu/science/starburst99/
+# Columns: time_yr, log_snr [yr^-1], log_snr_2, log_snr_3
 time_yr,log_snr,log_snr_2,log_snr_3
 10000.0,-30.0,-30.0,-30.0
 110000.0,-30.0,-30.0,-30.0

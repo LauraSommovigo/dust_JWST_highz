@@ -3,7 +3,7 @@
 This repository models high-redshift galaxies with a semi-analytic framework,
 focusing on how dust microphysics, ISM geometry, and turbulence shape UV and IR observables.
 
-Current paper draft: https://www.overleaf.com/read/rsnzrzvdkyvm#bbf2a2
+Paper: [Sommovigo et al. 2026](https://arxiv.org/abs/2602.18556)
 
 ## What This Project Does
 
@@ -11,34 +11,37 @@ Current paper draft: https://www.overleaf.com/read/rsnzrzvdkyvm#bbf2a2
 - Tracks dust mass build-up from SN yields.
 - Computes dust opacities and attenuation curves from grain models.
 - Predicts intrinsic/attenuated UV luminosities and UV/IR luminosity functions.
+- Computes greybody FIR SEDs with CMB corrections for ALMA observability.
 - Includes both uniform and clumpy/turbulent ISM treatments.
 
-## Current Repository Layout
+## Repository Layout
 
 - `src/dust_jwst_highz/`
   Core Python package with reusable physics and plotting utilities.
   - `model/`
     - `halo.py`: halo growth, virial radius, halo mass function utilities.
     - `star_formation.py`: stellar-mass mapping, SFR, SFH construction.
-    - `dust.py`: grain distributions, kappa calculations, optical depth, attenuation/transmission models.
+    - `dust.py`: grain distributions, kappa calculations, optical depth, attenuation/transmission models, greybody dust temperatures.
     - `ism.py`: turbulent ISM and lognormal surface-density models.
-    - `luminosity.py`: UV luminosity conversions and SB99/KS98-based luminosity calculations.
+    - `luminosity.py`: UV luminosity conversions, SB99-based luminosity calculations, greybody FIR flux.
     - `cosmology.py`: cosmology helpers.
-  - `data.py`: data-loading helpers (e.g., Hirashita and Draine interpolation functions).
+  - `data.py`: data-loading helpers (dust constants I/O).
   - `visualization.py`: observational LF plotting and colormap utilities.
-  - `constants.py`, `phys_utils.py`, `utils.py`: constants and shared numerics.
-- `notebooks/main.ipynb`
-  Main end-to-end analysis notebook (figures, parameter exploration, and LF workflows).
+  - `constants.py`, `utils.py`: constants and shared numerics.
+- `notebooks/`
+  - `main.py` / `main.ipynb`: main end-to-end analysis notebook (all paper figures).
+  - `notebook_dust_lf_cph26_z10.ipynb`: tutorial notebook for Copenhagen 2026 conference (z=10), using a simplified analytical model (Park+18 halo growth).
+  - `notebook_dust_lf_cph26_z7.ipynb`: companion tutorial notebook (z=7), including IR LF and greybody SED with REBELS data.
 - `data/`
-  Input tables (now CSV-based, plus one YAML parameter file).
+  Input tables (CSV-based, plus one YAML parameter file). All files include source references and DOIs in their headers.
 - `outputs/`
   Generated model products and figure outputs.
 
 ## Physical Modeling Summary
 
 - **Dust models**:
-  - MW-like WD01 grain populations.
-  - Stellar-dust-inspired distributions (Hirashita-style lognormal grains).
+  - MW-like WD01 grain populations (Weingartner & Draine 2001).
+  - Stellar-dust-inspired distributions (Hirashita & Aoyama 2019 lognormal grains).
 - **Geometry**:
   - Point-source and mixed-sphere attenuation treatments.
 - **Clumpiness/turbulence**:
@@ -70,8 +73,37 @@ Or open `notebooks/main.ipynb` in VS Code / JupyterLab and run all cells in orde
 
 Figure outputs are saved under `outputs/z{redshift}/`.
 
+## Citation
+
+If you use this code, please cite:
+
+```bibtex
+@ARTICLE{Sommovigo2026,
+       author = {{Sommovigo}, Laura and {Lancaster}, Lachlan and {Menon}, Shyam H. and {O'Leary}, Joseph A. and {Somerville}, Rachel S. and {Bryan}, Greg L.},
+        title = "{Blue Monsters and Dusty Descendants: Reconciling UV and IR Emission from Galaxies from z=7, up to z= 14}",
+      journal = {arXiv e-prints},
+     keywords = {Astrophysics of Galaxies},
+         year = 2026,
+        month = feb,
+          eid = {arXiv:2602.18556},
+        pages = {arXiv:2602.18556},
+          doi = {10.48550/arXiv.2602.18556},
+archivePrefix = {arXiv},
+       eprint = {2602.18556},
+ primaryClass = {astro-ph.GA},
+       adsurl = {https://ui.adsabs.harvard.edu/abs/2026arXiv260218556S},
+      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+}
+
+
+```
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
 ## Notes
 
 - The project requires Python 3.11+.
-- Data files previously stored as plain text tables have been migrated to CSV for consistency.
+- Data files include source references and DOIs in their headers.
 - `data/dust_constants.txt` is a generated file — do not edit by hand.

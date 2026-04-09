@@ -6,31 +6,6 @@ from numpy.typing import NDArray
 from .. import constants as const
 
 
-def compute_l1500_steps_kss(sfh: NDArray[np.floating]) -> NDArray[np.floating]:
-    """Compute the 1500 Å monochromatic luminosity using the KS+98 scaling.
-
-    This is a direct conversion with no convolution with SB99 models.
-    L_1500 [erg/s/Hz] = 7.14e27 * SFR [Msun/yr]
-
-    Parameters
-    ----------
-    sfh : ndarray
-        Star formation rate [M_sun/yr] at each time step.
-
-    Returns
-    -------
-    ndarray
-        UV luminosity at 1500 Å in [erg/s/Hz].
-
-    Notes
-    -----
-    This conversion is from Kennicutt (1998) for continuous star formation.
-
-    """
-    l1500 = 7.14e27 * sfh  # [erg/s/Hz], L_nu
-    return np.array(l1500)
-
-
 def l1500_to_muv_conv(l_1500_nu: float | NDArray[np.floating]) -> float | NDArray[np.floating]:
     """Convert L_1500 [erg/s/Hz] (L_nu) to absolute AB magnitude at 1500 Å.
 

@@ -1,7 +1,7 @@
 [project]
 name = "dust-jwst-highz"
 version = "0.1.0"
-description = "Add your description here"
+description = "Semi-analytic framework for modeling dust attenuation and re-emission in high-redshift galaxies observed with JWST and ALMA"
 readme = "README.md"
 authors = [
     { name = "Laura Sommovigo", email = "lsommovigo@flatironinstitute.org" },

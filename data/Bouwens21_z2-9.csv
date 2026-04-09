@@ -1,3 +1,7 @@
+# UV luminosity functions at z=2-9
+# Source: Bouwens et al. (2021), AJ, 162, 47
+# DOI: 10.3847/1538-3881/abf83e
+# Columns: redshift, MUV [mag], phi [Mpc^-3 mag^-1], err_phi_low, err_phi_up
 redshift,MUV,phi,err_phi_low,err_phi_up
 2,-21.86,0.000003,8e-06,8e-06
 2,-21.11,0.000270,8.9e-05,8.9e-05

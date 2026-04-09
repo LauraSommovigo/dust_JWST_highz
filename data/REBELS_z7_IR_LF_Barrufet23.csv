@@ -1,5 +1,7 @@
 # REBELS z=7 IR luminosity function
-# Source: Barrufet+23, Table 1
+# Source: Barrufet et al. (2023), MNRAS, 522, 3926 — DOI: 10.1093/mnras/stad1259
+# Survey: Bouwens et al. (2022), ApJ, 931, 160 — DOI: 10.3847/1538-4357/ac5a4a
+# Data from Table 1
 # log_phi errors are in dex (asymmetric; max between detection and non-detection)
 log_LIR,log_phi,log_phi_err_low,log_phi_err_high
 11.45,-4.3,0.2,0.2
