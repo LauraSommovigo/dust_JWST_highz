@@ -1,0 +1,61 @@
+[project]
+name = "dust-jwst-highz"
+version = "0.1.0"
+description = "Semi-analytic framework for modeling dust attenuation and re-emission in high-redshift galaxies observed with JWST and ALMA"
+readme = "README.md"
+authors = [
+    { name = "Laura Sommovigo", email = "lsommovigo@flatironinstitute.org" },
+    { name = "Joseph O'Leary", email = "oleary.joseph@outlook.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "astropy>=7.1.1",
+    "hmf>=3.5.2",
+    "matplotlib>=3.10.7",
+    "numpy>=2.3.4",
+    "pandas>=2.3.3",
+    "scipy>=1.16.2",
+]
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.1.1",
+    "jupytext>=1.19.1",
+    "pre-commit>=4.3.0",
+    "ruff>=0.14.2",
+]
+
+[tool.ruff]
+    line-length = 120
+    src         = ['./']
+
+[tool.ruff.lint]
+    ignore = ["D107", "D100", "D401", "E402"]
+    select = [
+        "D", # Docstring conventions
+        "E", # Errors
+        "F", # Formatting
+        "I", # Imports
+        "N", # Naming
+        "W291", # Trailing whitespace
+        "W292", # Blank lines at end of file
+        "W293"  # Blank lines in excess
+    ]
+
+[tool.ruff.lint.per-file-ignores]
+    "__init__.py" = [
+        "D104", # Ignore missing docstrings in __init__.py
+        ]
+    "tests/*"     = ["D103"] # Ignore missing docstrings in test functions
+
+[tool.ruff.format]
+    docstring-code-format      = true
+    docstring-code-line-length = "dynamic"
+    indent-style               = "space"
+    line-ending                = "auto"
+    quote-style                = "double"
+    skip-magic-trailing-comma  = false
+
+[build-system]
+requires = ["uv_build>=0.10.2,<0.11.0"]
+build-backend = "uv_build"
