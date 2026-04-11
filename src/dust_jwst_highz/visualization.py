@@ -258,7 +258,7 @@ def plot_lf_data(z, ax, data_dir=None, style_overrides=None):
 
     # ===== z < 10: Bouwens+21 (from CSV file) =====
     if z < 10:
-        obs_data = pd.read_csv(data_dir / "Bouwens21_z2-9.csv")
+        obs_data = pd.read_csv(data_dir / "Bouwens21_z2-9.csv", comment="#")
 
         mask = obs_data["redshift"] == z
         m_uv = obs_data["MUV"][mask].to_numpy(dtype=float)

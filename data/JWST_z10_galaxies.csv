@@ -1,10 +1,10 @@
 # JWST z>10 galaxy properties (compiled from multiple surveys)
 # Source: Ferrara et al. (2024) and references therein
 # arXiv: 2410.19042
-# Columns: name, tau_v, err_tau_low, err_tau_up, redshift, re_pc, err_re_low, err_re_up,
-#   SFR [Msun/yr], err_SFR_low, err_SFR_up, age [Myr], MUV [mag],
-#   log_Mstar [log Msun], err_logMstar_low, err_logMstar_high,
-#   IR_Flux [uJy], uplim_IRFlux (1=upper limit), lambda_obs [um], betaUV_obs
+# Columns: name ; tau_v ; err_tau_low ; err_tau_up ; redshift ; re_pc ; err_re_low ; err_re_up ;
+#   SFR [Msun/yr] ; err_SFR_low ; err_SFR_up ; age [Myr] ; MUV [mag] ;
+#   log_Mstar [log Msun] ; err_logMstar_low ; err_logMstar_high ;
+#   IR_Flux [uJy] ; uplim_IRFlux (1=upper limit) ; lambda_obs [um] ; betaUV_obs
 # Missing values encoded as -999
 name, tau_v, err_tau_low, err_tau_up, redshift, re_pc, err_re_low, err_re_up, SFR, err_SFR_low, err_SFR_up, age, MUV, log_Mstar, err_logMstar_low, err_logMstar_high, IR_Flux, uplim_IRFlux, lambda_obs, betaUV_obs
 CEERS27929,0.14,0.14,0.29,10.1,520,127,127,5.9,2.6,1.6,-999,-19.3,8.5,0.4,0.3,0,1,0,-999

@@ -1,8 +1,8 @@
-# UV luminosity at 1500 A for instantaneous burst, Z=0.01
-# Source: Starburst99 — Leitherer et al. (1999), ApJS, 123, 3
+# UV luminosity at 1500 A for instantaneous burst ; Z=0.01
+# Source: Starburst99 — Leitherer et al. (1999) ; ApJS ; 123 ; 3
 # DOI: 10.1086/313233
 # Website: https://www.stsci.edu/science/starburst99/
-# Columns: time_yr, log_l1500 [erg/s/Hz], log_l1500_2, log_l1500_3
+# Columns: time_yr ; log_l1500 [erg/s/Hz] ; log_l1500_2 ; log_l1500_3
 time_yr,log_l1500,log_l1500_2,log_l1500_3
 10000.0,39.274,38.402,38.9
 110000.0,39.277,38.404,38.903

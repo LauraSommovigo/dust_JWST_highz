@@ -117,9 +117,9 @@ custom_colormap = truncate_colormap(custom_colormap_base, 0.1, 1.0)
 # %%
 # Load SB99 tables: instantaneous burst, Z=0.001, Salpeter IMF (1-100 Msun)
 # All three instantaneous-burst files share the same time column (verified).
-_snr = pd.read_csv(DATA_DIR / "snr_inst_Z001.csv")
-_nion = pd.read_csv(DATA_DIR / "Ni_inst_Z001.csv")
-_l1500_inst = pd.read_csv(DATA_DIR / "L1500_inst_Z001.csv")
+_snr = pd.read_csv(DATA_DIR / "snr_inst_Z001.csv", comment="#")
+_nion = pd.read_csv(DATA_DIR / "Ni_inst_Z001.csv", comment="#")
+_l1500_inst = pd.read_csv(DATA_DIR / "L1500_inst_Z001.csv", comment="#")
 sb99_inst = pd.DataFrame(
     {
         "time_yr": _snr["time_yr"],
@@ -131,7 +131,7 @@ sb99_inst = pd.DataFrame(
 del _snr, _nion, _l1500_inst
 
 # L1500 continuous SFR track (different time grid from instantaneous)
-_cont = pd.read_csv(DATA_DIR / "L1500_cont_Z001.csv")
+_cont = pd.read_csv(DATA_DIR / "L1500_cont_Z001.csv", comment="#")
 sb99_cont = pd.DataFrame(
     {
         "time_yr": _cont["time_yr"],
@@ -363,7 +363,7 @@ print("=" * width + "\n")
 
 # %%
 # Load JWST z≥10 observational data
-jwst = pd.read_csv(DATA_DIR / "JWST_z10_galaxies.csv", skipinitialspace=True, na_values=[-999])
+jwst = pd.read_csv(DATA_DIR / "JWST_z10_galaxies.csv", skipinitialspace=True, na_values=[-999], comment="#")
 
 # REBELS z=7 data (Sommovigo+22b, Stefanon in prep.)
 rebels = pd.read_csv(DATA_DIR / "REBELS_z7_galaxies.csv", comment="#")
