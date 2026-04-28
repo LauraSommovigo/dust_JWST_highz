@@ -1,14 +1,14 @@
 # Dust opacity and scattering constants at key wavelengths
 # Computed from grain size distributions — do not edit by hand
-kUV_drn              105675.40944246
-kUV_drn_abs          58908.07297785
-kv_drn               42186.19814395
+kUV_drn              105881.56238305
+kUV_drn_abs          59121.12054043
+kv_drn               41153.39363138
 kIR_drn              21.99905176
-omega_1500_drn       0.44259655
-g_1500_drn           0.64592210
-kUV_hir              8077.94524315
-kUV_hir_abs          3997.21239941
-kv_hir               7576.25294719
+omega_1500_drn       0.44162969
+g_1500_drn           0.64670454
+kUV_hir              8078.46716546
+kUV_hir_abs          3994.69907057
+kv_hir               7443.57153623
 kIR_hir              3.18707390
-omega_1500_hir       0.50516919
-g_1500_hir           0.83130420
+omega_1500_hir       0.50551274
+g_1500_hir           0.83161251
