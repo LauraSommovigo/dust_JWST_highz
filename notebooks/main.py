@@ -178,6 +178,18 @@ radius_big = 0.1585  # 0.3 micron, where Hirashita young dust centred
 rho_carb = 2.24  # graphite
 rho_sil = 3.5  # silicate
 
+# Grain mixture weighting.
+# False (default): WD01 / Draine+03 — the per-H-atom dn/da already encodes
+#   the relative abundances of carbonaceous and silicate grains, so kappa
+#   components are summed directly (no mass-fraction weighting).
+# True: as in Sommovigo+25 — applies F_C=1/11, F_SI=10/11 mass fractions
+#   to carbonaceous and silicate kappa before combining.
+# NOTE: this flag only affects WD01 dust (MW). For stellar dust the
+# lognormal GSD is mass-normalised and always needs F_C/F_SI weighting.
+LEGACY_MASS_FRACTIONS = False
+F_C = 1.0 / 11.0
+F_SI = 10.0 / 11.0
+
 
 radius_graphite = dust_graphite["radius"].unique() * const.micron
 radius_silicate = dust_silicate["radius"].unique() * const.micron
@@ -262,16 +274,21 @@ kappa_s_sca_star = kappa_lambda(
 
 # put both components on the same λ grid (they *should* match; if not, interp)
 lam_um = wavelength_c  # = wavelength_s
-# Total stellar mixture — mass fractions fC=1/11, fSi=10/11 (Draine 2003, Table 2)
-kappa_abs_star_tot = (1.0 / 11.0) * kappa_c_abs_star + (10.0 / 11.0) * kappa_s_abs_star
-kappa_sca_star_tot = (1.0 / 11.0) * kappa_c_sca_star + (10.0 / 11.0) * kappa_s_sca_star
+# Total stellar mixture — stellar GSD is mass-normalised, always needs F_C/F_SI
+kappa_abs_star_tot = F_C * kappa_c_abs_star + F_SI * kappa_s_abs_star
+kappa_sca_star_tot = F_C * kappa_c_sca_star + F_SI * kappa_s_sca_star
 
 kappa_ext_star_tot = kappa_abs_star_tot + kappa_sca_star_tot
 omega_star_tot = kappa_sca_star_tot / kappa_ext_star_tot  # albedo
 
 # ---- Total MW mixture (C+Si) ----
-kappa_abs_tot = (1.0 / 11.0) * kappa_c_abs + (10.0 / 11.0) * kappa_s_abs
-kappa_sca_tot = (1.0 / 11.0) * kappa_c_sca + (10.0 / 11.0) * kappa_s_sca
+if LEGACY_MASS_FRACTIONS:
+    kappa_abs_tot = F_C * kappa_c_abs + F_SI * kappa_s_abs
+    kappa_sca_tot = F_C * kappa_c_sca + F_SI * kappa_s_sca
+else:
+    # WD01 dn/da per H already encodes relative abundances — direct sum
+    kappa_abs_tot = kappa_c_abs + kappa_s_abs
+    kappa_sca_tot = kappa_c_sca + kappa_s_sca
 
 kappa_ext_tot = kappa_abs_tot + kappa_sca_tot  # true extinction
 omega_tot = kappa_sca_tot / kappa_ext_tot  # albedo ω(λ)
@@ -285,39 +302,26 @@ _dust_constants_path = DATA_DIR / "dust_constants.txt"
 # Ascending wavelength grid (µm) matching the pivot tables used by kappa_lambda
 _wl_pivot_A = np.sort(dust_graphite["wavelength"].unique()) * 1e4  # µm → Å, ascending
 
-try:
-    _dc = load_dust_constants(_dust_constants_path)
-    kuv_drn     = _dc["kUV_drn"]
-    kuv_drn_abs = _dc["kUV_drn_abs"]
-    kv_drn      = _dc["kv_drn"]
-    kir_drn     = _dc["kIR_drn"]
-    kuv_hir     = _dc["kUV_hir"]
-    kuv_hir_abs = _dc["kUV_hir_abs"]
-    kv_hir      = _dc["kv_hir"]
-    kir_hir     = _dc["kIR_hir"]
-    print(f"Dust constants loaded from {_dust_constants_path}")
-except FileNotFoundError:
-    # Compute from grain size distributions (all kappa arrays are in ascending-wl
-    # order from the pivot, matching _wl_pivot_A)
-    kuv_drn     = float(np.interp(1500.0,  _wl_pivot_A, kappa_ext_tot))
-    kuv_drn_abs = float(np.interp(1500.0,  _wl_pivot_A, kappa_abs_tot))
-    kv_drn      = float(np.interp(5500.0,  _wl_pivot_A, kappa_ext_tot))
-    kir_drn     = float(np.interp(1.585e6, _wl_pivot_A, kappa_abs_tot))
-    kuv_hir     = float(np.interp(1500.0,  _wl_pivot_A, kappa_ext_star_tot))
-    kuv_hir_abs = float(np.interp(1500.0,  _wl_pivot_A, kappa_abs_star_tot))
-    kv_hir      = float(np.interp(5500.0,  _wl_pivot_A, kappa_ext_star_tot))
-    kir_hir     = float(np.interp(1.585e6, _wl_pivot_A, kappa_abs_star_tot))
-    # Save now (omega_1500 and g_1500 added after g_tot is computed, see Figure 4 cell)
-    save_dust_constants(
-        {
-            "kUV_drn": kuv_drn, "kUV_drn_abs": kuv_drn_abs,
-            "kv_drn":  kv_drn,  "kIR_drn":     kir_drn,
-            "kUV_hir": kuv_hir, "kUV_hir_abs": kuv_hir_abs,
-            "kv_hir":  kv_hir,  "kIR_hir":     kir_hir,
-        },
-        _dust_constants_path,
-    )
-    print(f"Dust constants computed and saved to {_dust_constants_path}")
+# Always compute from current kappa arrays (respects LEGACY_MASS_FRACTIONS setting)
+kuv_drn     = float(np.interp(1500.0,  _wl_pivot_A, kappa_ext_tot))
+kuv_drn_abs = float(np.interp(1500.0,  _wl_pivot_A, kappa_abs_tot))
+kv_drn      = float(np.interp(5500.0,  _wl_pivot_A, kappa_ext_tot))
+kir_drn     = float(np.interp(1.585e6, _wl_pivot_A, kappa_abs_tot))
+kuv_hir     = float(np.interp(1500.0,  _wl_pivot_A, kappa_ext_star_tot))
+kuv_hir_abs = float(np.interp(1500.0,  _wl_pivot_A, kappa_abs_star_tot))
+kv_hir      = float(np.interp(5500.0,  _wl_pivot_A, kappa_ext_star_tot))
+kir_hir     = float(np.interp(1.585e6, _wl_pivot_A, kappa_abs_star_tot))
+# Save (omega_1500 and g_1500 added after g_tot is computed, see Figure 4 cell)
+save_dust_constants(
+    {
+        "kUV_drn": kuv_drn, "kUV_drn_abs": kuv_drn_abs,
+        "kv_drn":  kv_drn,  "kIR_drn":     kir_drn,
+        "kUV_hir": kuv_hir, "kUV_hir_abs": kuv_hir_abs,
+        "kv_hir":  kv_hir,  "kIR_hir":     kir_hir,
+    },
+    _dust_constants_path,
+)
+print(f"Dust constants computed and saved to {_dust_constants_path}")
 
 londa = np.array([
     4217., 3981., 3758., 3548., 3350., 3162., 2985., 2818., 2661., 2512.,
@@ -1088,15 +1092,20 @@ _g_c = compute_g_lambda(_radii_c_um, _Qsca_c_2d, _g_c_2d, graphite_dist)
 _g_s = compute_g_lambda(_radii_s_um, _Qsca_s_2d, _g_s_2d, silicate_dist)
 
 # kappa_c_sca / kappa_s_sca are in ascending-wavelength order (from pivot, no reversal)
-_w_c = (1.0 / 11.0) * kappa_c_sca
-_w_s = (10.0 / 11.0) * kappa_s_sca
+if LEGACY_MASS_FRACTIONS:
+    _w_c = F_C * kappa_c_sca
+    _w_s = F_SI * kappa_s_sca
+else:
+    _w_c = kappa_c_sca
+    _w_s = kappa_s_sca
 g_tot = (_g_c * _w_c + _g_s * _w_s) / (_w_c + _w_s)
 
 # g_λ for stellar dust (same pivot tables, stellar GSD weights)
 _g_c_star = compute_g_lambda(_radii_c_um, _Qsca_c_2d, _g_c_2d, graphite_dist_star)
 _g_s_star = compute_g_lambda(_radii_s_um, _Qsca_s_2d, _g_s_2d, silicate_dist_star)
-_w_c_star = (1.0 / 11.0) * kappa_c_sca_star
-_w_s_star = (10.0 / 11.0) * kappa_s_sca_star
+# Stellar: always needs F_C/F_SI (mass-normalised GSD)
+_w_c_star = F_C * kappa_c_sca_star
+_w_s_star = F_SI * kappa_s_sca_star
 g_tot_star = (_g_c_star * _w_c_star + _g_s_star * _w_s_star) / (_w_c_star + _w_s_star)
 
 # Update dust_constants.txt with omega_1500 and g_1500 (require g_tot computed above).
