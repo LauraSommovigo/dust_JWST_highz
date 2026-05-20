@@ -12,7 +12,7 @@ from .halo import halo_mass_accretion_rate
 def halo_to_stellar_mass(
     halo_mass: float | NDArray[np.floating],
     baryon_fraction: float,
-    epsilon: float,
+    epsilon: float | NDArray[np.floating],
     alpha: float = 0.0,
 ) -> float | NDArray[np.floating]:
     """Convert halo mass to stellar mass with optional power-law scaling.
@@ -23,7 +23,7 @@ def halo_to_stellar_mass(
         Halo mass in solar masses (M_sun).
     baryon_fraction : float
         Baryon fraction f_b = Omega_b / Omega_m at the given redshift.
-    epsilon : float
+    epsilon : float or ndarray 
         Star formation efficiency parameter (dimensionless).
     alpha : float, optional
         Power-law index for mass-dependent efficiency. Default is 0.0,

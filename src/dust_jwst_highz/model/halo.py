@@ -7,6 +7,8 @@ from numpy.typing import NDArray
 from .. import constants as const
 from ..utils import chi
 from .cosmology import cosmo
+from scipy.interpolate import interp1d
+
 
 
 def growth_suppression(z, method: Literal["RP16", "GUREFT"] = "GUREFT"):
@@ -517,3 +519,45 @@ def logbeta_funct(z: float | NDArray[np.floating]) -> float | NDArray[np.floatin
     """
     a = 1.0 / (1.0 + z)
     return chi(2.578, -0.989, -1.545, a)
+
+
+
+def log_halo_mass_function_inv(
+    number_density: NDArray[np.floating],
+    redshift: float,
+    log_mass_range: tuple[float, float] = (6.0, 14.0),
+    n_grid: int = 1000,
+) -> NDArray[np.floating]:
+    
+    """
+    Invert log_halo_mass_function to obtain log10 halo mass
+
+    Parameters
+    ----------
+    number_density : ndarray
+        Halo number density dn/dlogMh in units of Mpc^-3 dex^-1
+
+    redshift : float
+        Redshift
+
+    log_mass_range : tuple
+        Minimum and maximum log10(Mh/Msun) used to construct
+        the interpolation grid
+
+    n_grid : int
+        Number of interpolation points
+
+    Returns
+    -------
+    ndarray
+        log10(Mh/Msun)
+    """
+
+    
+    log_mh_grid = np.linspace(log_mass_range[0], log_mass_range[1], n_grid)
+    nd_grid = log_halo_mass_function(log_mh_grid, redshift)
+    log_nd = np.log10(nd_grid)
+
+    interp = interp1d(log_nd[::-1], log_mh_grid[::-1], bounds_error=False, fill_value=np.nan)
+
+    return interp(np.log10(number_density))

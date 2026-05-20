@@ -3,16 +3,16 @@ from scipy.optimize import root_scalar
 from numpy.typing import NDArray
 
 
-def stellar_mass_z_to_metallicity(
-        redshift: float, 
+def stellar_mass_to_metallicity(
+        model: str, 
         stellar_mass: float | NDArray[np.floating],
     ) -> float | NDArray[np.floating]:
     
     """
     Parameters
     ----------
-    redshift: float
-        Redshift of the galaxy 
+    model: string
+        Model to use for the stellar mass-metallicity relation, either "FIRE2" or "SC"
     stellar_mass: float
         Stellar mass of the galaxy [log10(M/M_sun)]
         
@@ -29,23 +29,19 @@ def stellar_mass_z_to_metallicity(
 
     References
     ----------
-    Marszewsi et al. (2024), ...
+    Marszewsi et al. (2024), Somerville et al. (2015)
 
     """
 
-    a = 0.37
-    b = -4.3
+    if model == "FIRE2":
+        a = 0.37
+        b = -4.3
 
-    metallicity = a * stellar_mass + b 
+    if model == "SC":
+        a = 0.45
+        b = -4.7
 
-    #redshift-dependent case
-    #a = 0.37
-    #b = -4.25
-    #alpha = 0.21
-    #beta = 0.15
-    #metallicity = a * ( (1+z)/9 )**alpha *stellar_mass + b * ( (1+z)/9 )**beta
-
-    return metallicity
+    return a * stellar_mass + b
 
 
 
@@ -91,7 +87,7 @@ def mc_evolving_IMF(
     """
     
     # fraction of stellar mass in the log-flat IMF component, depends on redshift and metallicity
-    x = 1 + Z
+    x = 1 + metallicity 
     f_massive =  1.07*(1-(2**x)) + 0.04*redshift*(2.67**x)
         
     # imposing 0 < f_massive < 1
@@ -112,9 +108,8 @@ def mc_evolving_IMF(
          return I2 / (I1 + I2) - f_massive
     
     sol = root_scalar(equation_for_Mc, bracket=[Mi + 1e-6, Mf - 1e-6])
-    Mc = sol.root
     
-    return Mc
+    return sol.root
 
 
 
@@ -140,11 +135,11 @@ def select_SB99_tables(
     Returns
     -------
     filename_spectra: string
-        Name of the SB99 table with the spectrum
+        Name of the SB99 table with the spectrum fluxes
+    filename_wavelengths: string
+        Name of the SB99 table with the wavelengths
     filename_Ni: string
         Name of the SB99 table with the number of ionizing photons
-    filename_L1500: string
-        Name of the SB99 table with the UV luminosity at 1500A
     filename_snr: string
         Name of the SB99 table with the supernova rate
 
@@ -154,24 +149,112 @@ def select_SB99_tables(
 
     """
 
+    directory = "pySB99_models/" 
     Zsun = 0.02 #Anders&Grevesse89, used in FIRE-2
+    abs_Z = 10**(metallicity) *Zsun
 
-    abs_Z = 10**(metallicity*Zsun)
+    # SB99 tables parameters 
+    sb99_Z = np.array([1e-5, 4e-4, 2e-3, 6e-3, 1.4e-2, 1])
+    Z_labels = ["1e-5", "4e-4", "2e-3", "6e-3", "1.4e-2", "1"]
+    sb99_Mc_by_Z = {
+        "1e-5":  np.array([2, 5, 10]),
+        "4e-4":  np.array([2, 5, 10, 15]),
+        "2e-3":  np.array([5, 10, 15, 20, 30, 50]),
+        "6e-3":  np.array([10, 20, 30, 50, 70, 100]),
+        "1.4e-2": np.array([10, 20, 30, 50, 70, 100]),
+        "1":     np.array([10, 20, 30, 50, 70, 100]),
+    }
 
-    Z_values = np.array([0.0004, 0.001, 0.002, 0.1])
-    Z_labels = ["0004", "001", "0002", "1"]
-
-    idx = np.argmin(np.abs(Z_values - abs_Z))  # find closest
-    Z = Z_labels[idx]
-
-    Mc = np.round(imf_cutoff_mass, 1)
-    Mf = int(imf_maximum_mass)
+    # Find closest match in the SB99 tables 
+    Z = Z_labels[np.argmin(np.abs(sb99_Z - abs_Z))]  
+    sb99_Mc = sb99_Mc_by_Z[Z]                                   
+    Mc = int(sb99_Mc[np.argmin(np.abs(sb99_Mc - imf_cutoff_mass))])
     SN = int(SN_maximum_mass)
 
-    filename_spectra = f"directory/spectrum_inst_Z{Z}_Mc{Mc}_Mf{Mf}_SN{SN}.csv"
-    filename_Ni = f"directory/Ni_inst_Z{Z}_Mc{Mc}_Mf{Mf}_SN{SN}.csv"
-    filename_L1500 = f"directory/L1500_inst_Z{Z}_Mc{Mc}_Mf{Mf}_SN{SN}.csv"
-    filename_snr = f"directory/snr_inst_Z{Z}_Mc{Mc}_Mf{Mf}_SN{SN}.csv"
+    directory = f"pySB99_models/pySB99_mc{Mc}_z{Z}_sn{SN}"   
+    
+    filename_spectra = f"{directory}/pySB_SED_stellar.npy"
+    filename_wavelengths = f"{directory}/SED_wavelength.txt"
+    filename_Ni = f"{directory}/ion_flux_HI.txt"
+    filename_snr = f"{directory}/SNrate.txt"
 
-    return filename_spectra, filename_Ni, filename_L1500, filename_snr
+    return filename_spectra, filename_wavelengths, filename_Ni, filename_snr
 
+
+
+
+def compute_L1500(
+        wavelength: NDArray[np.floating],
+        spectra: NDArray[np.floating],
+        wave_center = 1500.0, wave_window=25.0, log_flux=True
+    ) -> NDArray[np.floating]:
+    
+    """
+    Parameters
+    ----------
+    wavelength: array
+        Wavelengths (A)
+    spectra: array
+        Spectra fluxes (erg/s/A)
+    wave_center: float
+        Central wavelength of the window to compute the UV luminosity (A)
+    wave_window: float
+        Width of the window to compute the UV luminosity (A)
+    log_flux: bool
+        if True, spectra are in log units
+
+    Returns
+    -------
+    L1500: array
+        UV luminosity at 1500A (erg/s)
+
+    Notes
+    -----
+    Computes the UV luminosity at 1500A from the SB99 spectra
+
+    """
+    
+    wave_mask = (wavelength >= wave_center - wave_window) & (wavelength <= wave_center + wave_window)
+    flux = 10**spectra if log_flux else spectra
+    l1500 = np.trapezoid(flux[:, wave_mask], wavelength[wave_mask], axis=1)
+
+    return l1500 / (wave_center + wave_window - (wave_center - wave_window))
+
+
+def evolving_SFE(
+        halo_mass: float | NDArray[np.floating], 
+        redshift:float
+    ) -> float | NDArray[np.floating]:
+    
+    """
+    Parameters
+    ----------
+    halo_mass: float
+        Halo mass of the galaxy (M_sun)
+    redshift: float
+        Redshift of the galaxy
+
+    Returns
+    -------
+    SFE: float
+        Star formation efficiency
+
+    Notes
+    -----
+    Formula from Yung et al. (2025)
+    """
+
+    if redshift == 14: 
+            e0 = 0.40
+            Mo = 10**10.40
+            alpha = 0.97
+            beta = 0.39
+    else:
+            e0 = 0.46
+            Mo = 10**10.94
+            alpha = 1.17
+            beta = 0.41
+
+    SFE = (2*e0)/( (halo_mass/Mo)**(-alpha) + (halo_mass/Mo)**(beta) )
+
+    return SFE

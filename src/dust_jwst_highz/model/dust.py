@@ -1159,3 +1159,59 @@ def seedavg_lir(
     f_abs = np.sum(w_n[None, :] * a_n, axis=1).mean()
 
     return l_intr * f_abs * (const.c / 1500e-8)
+
+
+
+def compute_mdust_steps_IMF(
+    age: NDArray[np.floating],
+    tstep: float,
+    sfh: NDArray[np.floating],
+    tables: list[dict],
+    yd: float,
+) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
+    """Compute cumulative supernova count and dust mass at each time step.
+
+    Convolves the star formation history with supernova rate models to calculate
+    the cumulative number of supernovae and resulting dust mass produced at each
+    age step, accounting for delayed supernova explosions after star formation.
+
+    Parameters
+    ----------
+    age : ndarray
+        Array of time steps in Myr at which to evaluate dust mass.
+    tstep : float
+        Time step size in Myr between consecutive age values.
+    sfh : ndarray
+        Star formation rate history in M_sun/yr at each time step.
+    tables : list of dict
+        SB99 table dicts with "time_yr" and "log_snr" arrays
+    yd : float
+        Dust yield per supernova in M_sun.
+
+    Returns
+    -------
+    n_sn_arr : ndarray
+        Cumulative number of supernovae at each age step.
+    mdust_arr : ndarray
+        Total dust mass in M_sun at each age step, computed as n_sn_arr * yd.
+    """
+    n_sn_cumulative = 0
+    n_sn_arr = []
+    for ind in range(len(age)):
+        n_sn_step = 0
+        for t in range(ind + 1):
+            time_delay_yr = 1e6 * tstep * (ind - t)
+
+            # Use the SN rate table appropriate for the mass at formation step t
+            time_yr    = tables[t]["time_yr"]
+            log_snr_yr = tables[t]["log_snr"]
+
+            snr_interp = 10 ** np.interp(time_delay_yr, time_yr, log_snr_yr)
+            n_sn_step += snr_interp * 1e6 * tstep * sfh[t] * tstep
+        n_sn_cumulative += n_sn_step
+        n_sn_arr.append(n_sn_cumulative)
+    n_sn_arr = np.array(n_sn_arr)
+    mdust_arr = n_sn_arr * yd
+    return n_sn_arr, mdust_arr
+
+

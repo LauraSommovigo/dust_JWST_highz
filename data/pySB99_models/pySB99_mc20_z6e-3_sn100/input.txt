@@ -1,0 +1,13 @@
+M_total = 1000000.0Msol
+IMF_exponents = [2.35, 1.001]
+IMF_mass_limits = (0.1, 20, 100.0)
+run_speed_mode = DEFAULT
+Metallicity input = LMC
+SED library input = FW
+spectra library input = WM
+Rotation input = False
+Ionising flux output choice = True
+Wind output choice = True
+UV slope output choice = True
+Equivalent width output choice = True
+Hires spectra output choice = True
