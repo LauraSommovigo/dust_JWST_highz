@@ -250,3 +250,95 @@ def greybody_fnu(
         * const.M_sun
         * (1.0 / (np.exp(const.h * const.c / (const.k_B * td_corr * lam_rest_cm)) - 1.0) - cmb)
     )
+
+
+
+def compute_dotnion_steps_IMF(
+    age: NDArray[np.floating],
+    tstep: float,
+    sfh: NDArray[np.floating],
+    tables: list[dict],
+) -> NDArray[np.floating]:
+    """Computes the instantaneous ionizing photon production rate at each age step.
+
+    Parameters
+    ----------
+    age : ndarray
+        Age grid in Myr.
+    tstep : float
+        Time step size in Myr.
+    sfh : ndarray
+        Star formation rate history (M_sun/yr) at each age step.
+    tables : list of dict
+        SB99 table dicts with "time_yr" and "log_dot_nion" arrays
+
+
+    Returns
+    -------
+    dotnion_arr : ndarray
+        Array of instantaneous ionizing photon rate [photons/s] at each age step.
+    """
+
+    
+    dotnion_arr = []
+    for ind in range(len(age)):
+        dotnion_step = 0.0
+        for t in range(ind + 1):
+            dt_yr = 1e6 * tstep * (ind - t)
+
+            # Use the ionizing photon table appropriate for the mass at formation step t
+            time_yr_nion  = tables[t]["time_yr"]
+            log_dot_nion  = tables[t]["log_dot_nion"]
+
+            dotnion_ssp   = 10 ** np.interp(dt_yr, time_yr_nion, log_dot_nion)
+            dotnion_step += dotnion_ssp * sfh[t] * tstep
+        dotnion_arr.append(dotnion_step)
+    return np.array(dotnion_arr)
+
+
+
+def compute_l1500_steps_sb99_IMF(
+    age: NDArray[np.floating],
+    tstep: float,
+    sfh: NDArray[np.floating],
+    tables: list[dict],
+) -> NDArray[np.floating]:
+    
+    """Compute L_1500 [erg/s/Hz] at each time step, using per-timestep SB99 tables.
+
+    Each burst at step t uses the SB99 table selected for the metallicity and
+    IMF cutoff appropriate to the stellar mass of the galaxy at that formation epoch.
+
+    Parameters
+    ----------
+    age : ndarray
+        Age grid in Myr.
+    tstep : float
+        Time step size in Myr.
+    sfh : ndarray
+        Star formation rate history [M_sun/yr] at each time step.
+    tables : list of dict
+        SB99 table dicts with "time_yr" and "l1500" arrays
+
+    Returns
+    -------
+    ndarray
+        Total L1500 [erg/s/Hz] at each age step.
+    """
+
+    l1500_arr = []
+    for ind in range(len(age)):
+        l1500_step = 0.0
+        for t in range(ind + 1):
+            age_delay = 1e6 * tstep * (ind - t)  # time since burst t, in years
+
+            # Use the table selected for the mass the galaxy had at step t
+            time_yr_l1500 = tables[t]["time_yr"]
+            l1500_ssp_log = tables[t]["l1500"]
+
+            l1500_ssp  = 10 ** np.interp(age_delay, time_yr_l1500, l1500_ssp_log)
+            mass_formed = sfh[t] * tstep * 1e6  # Msun formed in this burst
+            l1500_step += l1500_ssp * (mass_formed / 1e6)
+
+        l1500_arr.append(l1500_step)
+    return l1500_lambda_to_lnu(np.array(l1500_arr))
