@@ -4,6 +4,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .. import constants as const
+from .cosmology import cosmo
+from .dust import dust_temp_cmb_corrected
 
 
 def l1500_to_muv_conv(l_1500_nu: float | NDArray[np.floating]) -> float | NDArray[np.floating]:
@@ -190,6 +192,59 @@ def compute_dotnion_steps(age, tstep, sfh, time_yr_nion, log_dot_nion):
     return np.array(dotnion_arr)
 
 
+def cmb_floor_fnu(
+    lam_rest_cm: float | NDArray[np.floating],
+    log_mdust: float,
+    redshift: float,
+    kabs_158: float,
+    emissivity: float = 2.03,
+) -> float | NDArray[np.floating]:
+    """Observed-frame F_ν [µJy] of the CMB floor for a greybody source.
+
+    Returns the CMB contribution that is subtracted in greybody_fnu, i.e.
+    the flux below which dust emission is undetectable against the CMB
+    background.  Same opacity weighting as greybody_fnu but uses only B(T_CMB(z)).
+
+    Parameters
+    ----------
+    lam_rest_cm : float or ndarray
+        Rest-frame wavelength(s) [cm].
+    log_mdust : float
+        log10(M_dust / M_sun).
+    redshift : float
+        Source redshift.
+    kabs_158 : float
+        Dust absorption opacity at 158 µm [cm² g⁻¹].
+    emissivity : float, optional
+        Dust emissivity index β. Default 2.03.
+
+    Returns
+    -------
+    float or ndarray
+        F_ν in µJy at the observed-frame wavelengths.
+
+    """
+    dl_cm = cosmo.luminosity_distance(redshift).value * const.Mpc
+    cost = 1e29 * lam_rest_cm**2 / const.c / (4.0 * np.pi * dl_cm**2)
+
+    tcmb = cosmo.Tcmb(0).value * (1.0 + redshift)
+    cmb = 1.0 / (np.exp(const.h * const.c / (const.k_B * tcmb * lam_rest_cm)) - 1.0)
+
+    lam_158_cm = 158e-4
+    kap_lam = kabs_158 * (lam_rest_cm / lam_158_cm) ** (-emissivity)
+
+    return (
+        (1.0 + redshift)
+        * cost
+        * (8.0 * np.pi * const.h * const.c**2)
+        * kap_lam
+        * lam_rest_cm**(-5.0)
+        * 10.0**log_mdust
+        * const.M_sun
+        * cmb
+    )
+
+
 def greybody_fnu(
     lam_rest_cm: float | NDArray[np.floating],
     dust_temp: float,
@@ -227,9 +282,6 @@ def greybody_fnu(
     from the observed flux.
 
     """
-    from .dust import dust_temp_cmb_corrected
-    from .cosmology import cosmo
-
     td_corr = dust_temp_cmb_corrected(dust_temp, redshift, emissivity)
     dl_cm = cosmo.luminosity_distance(redshift).value * const.Mpc   # cm
     cost = 1e29 * lam_rest_cm**2 / const.c / (4.0 * np.pi * dl_cm**2)

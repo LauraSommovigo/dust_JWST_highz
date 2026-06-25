@@ -56,6 +56,7 @@ from dust_jwst_highz.model.dust import (
 from dust_jwst_highz.model.halo import halo_mass_accretion_rate, log_halo_mass_function, virial_radius
 from dust_jwst_highz.model.ism import density_compression_ratio, lognormal_variance_from_mach, sample_surface_density
 from dust_jwst_highz.model.luminosity import (
+    cmb_floor_fnu,
     compute_dotnion_steps,
     compute_l1500_steps,
     greybody_fnu,
@@ -403,7 +404,7 @@ def props_path(
 # Model parameters
 
 
-redshift = 7  # Target redshift (7,10,14)
+redshift = 10  # Target redshift (7,10,14)
 OUTPUT_DIR = (OUTPUT_DIR / f"z{int(redshift)}").resolve()
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 Mh_array = np.logspace(8, 12, 8)  # Halo mass range (same as Yung+23)
@@ -1868,6 +1869,10 @@ if redshift in (7, 10):
             ax10.plot(np.log10(lam_obs_um), np.log10(_fnu),
                       color=_mod["color"], ls=_ls_mach[_mach], lw=2.2, alpha=0.75,
                       label=fr'{_mod["name"]}, $\mathcal{{M}}$={_mach} ($T_d$={_td:.0f} K)')
+        _fnu_cmb = cmb_floor_fnu(lam_rest_cm, np.log10(_mdust_sed), redshift, _mod["kIR"])
+        ax10.plot(np.log10(lam_obs_um), np.log10(_fnu_cmb),
+                  color=_mod["color"], ls=":", lw=1.5, alpha=0.55,
+                  label=fr'{_mod["name"]} CMB floor ($T_{{\rm CMB}}$)')
 
     # Overplot observational constraints — same colour normalisation as fig3
     if redshift == 7:
